@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    # Image is amd64-only; on Apple Silicon Docker uses emulation — explicit platform avoids the mismatch warning.
+    platform: linux/amd64
+    container_name: poi-curator-db
+    environment:
+      POSTGRES_USER: poi_curator
+      POSTGRES_PASSWORD: poi_curator
+      POSTGRES_DB: poi_curator
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U poi_curator -d poi_curator"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+volumes:
+  postgres-data:
