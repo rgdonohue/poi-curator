@@ -1,0 +1,291 @@
+{
+  "version": 0.6,
+  "generator": "fixture",
+  "elements": [
+    {
+      "type": "way",
+      "id": 1001,
+      "center": { "lat": 35.6870, "lon": -105.9378 },
+      "geometry": [
+        { "lat": 35.6868, "lon": -105.9381 },
+        { "lat": 35.6872, "lon": -105.9381 },
+        { "lat": 35.6872, "lon": -105.9375 },
+        { "lat": 35.6868, "lon": -105.9375 },
+        { "lat": 35.6868, "lon": -105.9381 }
+      ],
+      "tags": {
+        "name": "Santa Fe Plaza",
+        "historic": "district",
+        "place": "square",
+        "highway": "pedestrian",
+        "wikidata": "Q999002",
+        "wikipedia": "en:Santa_Fe_Plaza"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1002,
+      "center": { "lat": 35.6828, "lon": -105.9319 },
+      "geometry": [
+        { "lat": 35.6825, "lon": -105.9322 },
+        { "lat": 35.6831, "lon": -105.9316 }
+      ],
+      "tags": {
+        "name": "Acequia Madre",
+        "man_made": "canal",
+        "historic": "yes",
+        "wikidata": "Q999001"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1003,
+      "lat": 35.6917,
+      "lon": -105.9348,
+      "tags": {
+        "name": "Cross of the Martyrs Overlook",
+        "tourism": "viewpoint",
+        "historic": "memorial",
+        "wikipedia": "en:Cross_of_the_Martyrs"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1004,
+      "center": { "lat": 35.6821, "lon": -105.9495 },
+      "geometry": [
+        { "lat": 35.6818, "lon": -105.9498 },
+        { "lat": 35.6824, "lon": -105.9492 }
+      ],
+      "tags": {
+        "name": "Santa Fe Rail Yard District",
+        "railway": "yard",
+        "man_made": "works",
+        "historic": "industrial"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1005,
+      "center": { "lat": 35.6844, "lon": -105.9170 },
+      "geometry": [
+        { "lat": 35.6841, "lon": -105.9173 },
+        { "lat": 35.6847, "lon": -105.9167 }
+      ],
+      "tags": {
+        "name": "Canyon Road Arts Corridor",
+        "tourism": "gallery",
+        "place": "neighbourhood"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1006,
+      "lat": 35.6883,
+      "lon": -105.9394,
+      "tags": {
+        "name": "New Mexico History Museum",
+        "tourism": "museum",
+        "historic": "yes",
+        "wikidata": "Q1470543"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1007,
+      "lat": 35.6840,
+      "lon": -105.9363,
+      "tags": {
+        "name": "San Miguel Chapel",
+        "amenity": "place_of_worship",
+        "historic": "church",
+        "wikipedia": "en:San_Miguel_Mission"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1008,
+      "center": { "lat": 35.6806, "lon": -105.9538 },
+      "geometry": [
+        { "lat": 35.6803, "lon": -105.9541 },
+        { "lat": 35.6809, "lon": -105.9535 }
+      ],
+      "tags": {
+        "name": "Santa Fe Farmers Market",
+        "amenity": "marketplace",
+        "place": "square"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1009,
+      "center": { "lat": 35.6926, "lon": -105.9369 },
+      "geometry": [
+        { "lat": 35.6922, "lon": -105.9373 },
+        { "lat": 35.6930, "lon": -105.9365 }
+      ],
+      "tags": {
+        "name": "Fort Marcy Park",
+        "leisure": "park",
+        "historic": "fort"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1010,
+      "lat": 35.6588,
+      "lon": -105.9112,
+      "tags": {
+        "name": "Atalaya Ridge Overlook",
+        "tourism": "viewpoint",
+        "natural": "ridge"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1011,
+      "lat": 35.6888,
+      "lon": -105.9370,
+      "tags": {
+        "name": "Palace Avenue Mural",
+        "tourism": "artwork",
+        "artwork_type": "mural"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1012,
+      "lat": 35.6809,
+      "lon": -105.9351,
+      "tags": {
+        "name": "De Vargas Street House",
+        "historic": "yes",
+        "tourism": "attraction"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1013,
+      "lat": 35.6817,
+      "lon": -105.9501,
+      "tags": {
+        "name": "Railyard Water Tower",
+        "man_made": "water_tower",
+        "historic": "yes"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1014,
+      "center": { "lat": 35.6829, "lon": -105.9346 },
+      "geometry": [
+        { "lat": 35.6825, "lon": -105.9350 },
+        { "lat": 35.6833, "lon": -105.9342 }
+      ],
+      "tags": {
+        "name": "Barrio de Analco",
+        "place": "neighbourhood",
+        "historic": "district"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1015,
+      "center": { "lat": 35.6861, "lon": -105.9392 },
+      "geometry": [
+        { "lat": 35.6858, "lon": -105.9395 },
+        { "lat": 35.6864, "lon": -105.9389 }
+      ],
+      "tags": {
+        "name": "Old Santa Fe Trail Plaza",
+        "place": "square",
+        "highway": "pedestrian",
+        "historic": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1016,
+      "lat": 35.6879,
+      "lon": -105.9386,
+      "tags": {
+        "name": "Palace of the Governors Statue",
+        "tourism": "artwork",
+        "artwork_type": "statue",
+        "historic": "monument"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1017,
+      "center": { "lat": 35.6678, "lon": -105.9590 },
+      "geometry": [
+        { "lat": 35.6675, "lon": -105.9593 },
+        { "lat": 35.6681, "lon": -105.9587 }
+      ],
+      "tags": {
+        "name": "Santa Fe River Trail Access",
+        "leisure": "park",
+        "waterway": "river"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1018,
+      "lat": 35.6855,
+      "lon": -105.9342,
+      "tags": {
+        "name": "Loretto Chapel",
+        "amenity": "place_of_worship",
+        "historic": "church",
+        "tourism": "attraction"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1019,
+      "lat": 35.6698,
+      "lon": -105.9124,
+      "tags": {
+        "name": "Sun Mountain Ridge",
+        "natural": "ridge"
+      }
+    },
+    {
+      "type": "way",
+      "id": 1020,
+      "center": { "lat": 35.6800, "lon": -105.9546 },
+      "geometry": [
+        { "lat": 35.6797, "lon": -105.9549 },
+        { "lat": 35.6803, "lon": -105.9543 }
+      ],
+      "tags": {
+        "name": "Santa Fe Depot Plaza",
+        "railway": "station",
+        "historic": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1021,
+      "lat": 35.6819,
+      "lon": -105.9512,
+      "tags": {
+        "name": "El Museo Cultural",
+        "amenity": "theatre",
+        "historic": "yes"
+      }
+    },
+    {
+      "type": "node",
+      "id": 1022,
+      "lat": 35.6834,
+      "lon": -105.9311,
+      "tags": {
+        "name": "Acequia Trail Crossing",
+        "man_made": "bridge",
+        "historic": "yes"
+      }
+    }
+  ]
+}

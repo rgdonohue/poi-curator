@@ -1,0 +1,130 @@
+{
+  "fixtures": [
+    {
+      "name": "Historic Center Driving",
+      "description": "Short downtown drive where historic stops should dominate.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.94, 35.681], [-105.933, 35.689]]
+        },
+        "origin": { "name": "Southwest", "coordinates": [-105.94, 35.681] },
+        "destination": { "name": "Northeast", "coordinates": [-105.933, 35.689] },
+        "travel_mode": "driving",
+        "category": "history",
+        "max_detour_meters": 1800,
+        "max_extra_minutes": 8,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": true,
+      "expected_any_names": ["De Vargas Street House", "San Miguel Chapel", "Santa Fe Plaza"],
+      "forbidden_names": ["Santa Fe Farmers Market"]
+    },
+    {
+      "name": "Historic Core Walking",
+      "description": "Walkable route through the center where civic and cultural texture should appear.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.9395, 35.6815], [-105.9345, 35.6885]]
+        },
+        "origin": { "name": "South Plaza Edge", "coordinates": [-105.9395, 35.6815] },
+        "destination": { "name": "North Plaza Edge", "coordinates": [-105.9345, 35.6885] },
+        "travel_mode": "walking",
+        "category": "civic",
+        "max_detour_meters": 700,
+        "max_extra_minutes": 10,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": true,
+      "expected_any_names": ["Santa Fe Plaza", "Old Santa Fe Trail Plaza"],
+      "forbidden_names": ["Atalaya Ridge Overlook"]
+    },
+    {
+      "name": "Rail Yard Corridor",
+      "description": "Route through the rail yard where infrastructure should score clearly.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.955, 35.679], [-105.948, 35.6835]]
+        },
+        "origin": { "name": "Depot South", "coordinates": [-105.955, 35.679] },
+        "destination": { "name": "Depot North", "coordinates": [-105.948, 35.6835] },
+        "travel_mode": "driving",
+        "category": "civic",
+        "max_detour_meters": 1500,
+        "max_extra_minutes": 7,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": true,
+      "expected_any_names": ["Santa Fe Rail Yard District", "Santa Fe Depot Plaza", "Railyard Water Tower"],
+      "forbidden_names": ["Cross of the Martyrs Overlook"]
+    },
+    {
+      "name": "Arts Corridor Walk",
+      "description": "Short walk near Canyon Road where art should dominate.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.919, 35.6838], [-105.9155, 35.6852]]
+        },
+        "origin": { "name": "Canyon South", "coordinates": [-105.919, 35.6838] },
+        "destination": { "name": "Canyon North", "coordinates": [-105.9155, 35.6852] },
+        "travel_mode": "walking",
+        "category": "art",
+        "max_detour_meters": 500,
+        "max_extra_minutes": 8,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": true,
+      "expected_any_names": ["Canyon Road Arts Corridor"],
+      "forbidden_names": ["Santa Fe Rail Yard District"]
+    },
+    {
+      "name": "Acequia Neighborhood Route",
+      "description": "Neighborhood route where acequia and historic neighborhood context should be plausible.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.936, 35.6815], [-105.931, 35.684]]
+        },
+        "origin": { "name": "Analco South", "coordinates": [-105.936, 35.6815] },
+        "destination": { "name": "Acequia East", "coordinates": [-105.931, 35.684] },
+        "travel_mode": "walking",
+        "category": "civic",
+        "max_detour_meters": 800,
+        "max_extra_minutes": 10,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": true,
+      "expected_any_names": ["Acequia Madre", "Old Santa Fe Trail Plaza"],
+      "forbidden_names": ["Atalaya Ridge Overlook"]
+    },
+    {
+      "name": "Downtown Scenic Empty",
+      "description": "Tight downtown scenic request that should honestly return nothing.",
+      "request": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [[-105.94, 35.68], [-105.93, 35.67]]
+        },
+        "origin": { "name": "A", "coordinates": [-105.94, 35.68] },
+        "destination": { "name": "B", "coordinates": [-105.93, 35.67] },
+        "travel_mode": "driving",
+        "category": "scenic",
+        "max_detour_meters": 1600,
+        "max_extra_minutes": 8,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "expected_non_empty": false,
+      "expected_any_names": [],
+      "forbidden_names": ["Cross of the Martyrs Overlook", "Atalaya Ridge Overlook"]
+    }
+  ]
+}
