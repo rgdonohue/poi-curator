@@ -130,6 +130,12 @@ class POI(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
 
     raw_sources: Mapped[list[POISourceRaw]] = relationship(back_populates="canonical_poi")
+    aliases: Mapped[list["POIAlias"]] = relationship(back_populates="poi")
+    evidence_items: Mapped[list["POIEvidence"]] = relationship(back_populates="poi")
+    match_diagnostics: Mapped[list["OfficialMatchDiagnostic"]] = relationship(
+        back_populates="poi",
+        foreign_keys="OfficialMatchDiagnostic.matched_poi_id",
+    )
     signals: Mapped["POISignals | None"] = relationship(back_populates="poi", uselist=False)
     editorial: Mapped["POIEditorial | None"] = relationship(back_populates="poi", uselist=False)
 
@@ -146,6 +152,9 @@ class POISignals(Base):
         default=False,
         nullable=False,
     )
+    official_corroboration_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    district_membership_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    institutional_identity_score: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     osm_tag_richness: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     description_quality: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
     entity_type_confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
@@ -177,3 +186,91 @@ class POIEditorial(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
 
     poi: Mapped[POI] = relationship(back_populates="editorial")
+
+
+class SourceRegistry(Base):
+    __tablename__ = "source_registry"
+
+    source_id: Mapped[str] = mapped_column(String(128), primary_key=True)
+    organization_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    source_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    trust_class: Mapped[str] = mapped_column(String(64), nullable=False)
+    base_url: Mapped[str | None] = mapped_column(Text)
+    license_notes: Mapped[str | None] = mapped_column(Text)
+    crawl_allowed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    ingest_method: Mapped[str] = mapped_column(String(64), nullable=False)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    evidence_items: Mapped[list["POIEvidence"]] = relationship(back_populates="source")
+    match_diagnostics: Mapped[list["OfficialMatchDiagnostic"]] = relationship(
+        back_populates="source"
+    )
+
+
+class POIAlias(Base):
+    __tablename__ = "poi_alias"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    poi_id: Mapped[str] = mapped_column(ForeignKey("poi.poi_id"), nullable=False)
+    alias_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    normalized_alias: Mapped[str] = mapped_column(String(255), nullable=False)
+    alias_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    source: Mapped[str] = mapped_column(String(128), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    is_preferred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    poi: Mapped[POI] = relationship(back_populates="aliases")
+
+
+class POIEvidence(Base):
+    __tablename__ = "poi_evidence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    evidence_key: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
+    poi_id: Mapped[str] = mapped_column(ForeignKey("poi.poi_id"), nullable=False)
+    source_id: Mapped[str] = mapped_column(ForeignKey("source_registry.source_id"), nullable=False)
+    evidence_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    evidence_label: Mapped[str | None] = mapped_column(String(255))
+    evidence_text: Mapped[str | None] = mapped_column(Text)
+    evidence_url: Mapped[str | None] = mapped_column(Text)
+    external_record_id: Mapped[str | None] = mapped_column(String(255))
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    raw_evidence_json: Mapped[dict | None] = mapped_column(JSONB)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    poi: Mapped[POI] = relationship(back_populates="evidence_items")
+    source: Mapped[SourceRegistry] = relationship(back_populates="evidence_items")
+
+
+class OfficialMatchDiagnostic(Base):
+    __tablename__ = "official_match_diagnostic"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("source_registry.source_id"), nullable=False)
+    region: Mapped[str] = mapped_column(String(128), nullable=False)
+    external_record_id: Mapped[str | None] = mapped_column(String(255))
+    external_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    matched_poi_id: Mapped[str | None] = mapped_column(ForeignKey("poi.poi_id"))
+    resolved_poi_id: Mapped[str | None] = mapped_column(ForeignKey("poi.poi_id"))
+    best_candidate_name: Mapped[str | None] = mapped_column(String(255))
+    best_similarity: Mapped[float | None] = mapped_column(Float)
+    match_strategy: Mapped[str | None] = mapped_column(String(64))
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    resolution_method: Mapped[str | None] = mapped_column(String(32))
+    raw_payload_json: Mapped[dict | None] = mapped_column(JSONB)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    source: Mapped[SourceRegistry] = relationship(back_populates="match_diagnostics")
+    poi: Mapped[POI | None] = relationship(
+        back_populates="match_diagnostics",
+        foreign_keys=[matched_poi_id],
+    )
+    resolved_poi: Mapped[POI | None] = relationship(foreign_keys=[resolved_poi_id])

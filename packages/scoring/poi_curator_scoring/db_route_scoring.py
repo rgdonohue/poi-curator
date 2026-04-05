@@ -3,10 +3,22 @@ from functools import lru_cache
 from typing import Literal
 
 from poi_curator_domain.db import POI
-from poi_curator_domain.schemas import RouteResult, RouteSuggestRequest
+from poi_curator_domain.descriptions import choose_short_description_for_poi
+from poi_curator_domain.schemas import (
+    NearbySuggestRequest,
+    RouteResult,
+    RouteSuggestRequest,
+)
 from pyproj import Transformer
 from shapely.geometry import LineString, Point
 from shapely.ops import transform
+
+from poi_curator_scoring.shared_scoring import (
+    build_badges,
+    build_why_it_matters,
+    compute_category_context_components,
+    compute_non_spatial_score_components,
+)
 
 
 @dataclass(frozen=True)
@@ -36,12 +48,18 @@ def project_geometry(geometry: LineString | Point) -> LineString | Point:
     return transform(transformer.transform, geometry)
 
 
-def category_matches(payload: RouteSuggestRequest, poi: POI) -> bool:
-    return category_match_type(payload, poi) != "none"
+def category_matches(
+    payload: RouteSuggestRequest | NearbySuggestRequest,
+    poi: POI,
+) -> bool:
+    match_type = category_match_type(payload, poi)
+    if match_type == "none":
+        return False
+    return _passes_category_specific_eligibility(payload.category, poi)
 
 
 def category_match_type(
-    payload: RouteSuggestRequest,
+    payload: RouteSuggestRequest | NearbySuggestRequest,
     poi: POI,
 ) -> CategoryMatchTypeInternal:
     if payload.category == "mixed":
@@ -106,31 +124,26 @@ def score_candidate(
     match_type = category_match_type(payload, poi)
     category_bonus = score_category_match(match_type)
     category_intent_guardrail = score_category_intent_guardrail(match_type, metrics)
-    affinity_hint = (
-        poi.drive_affinity_hint if payload.travel_mode == "driving" else poi.walk_affinity_hint
-    )
     route_proximity = round(metrics.proximity_score, 2)
     detour_fit = round(metrics.detour_score, 2)
     budget_fit = round(metrics.budget_score, 2)
-    significance = round((poi.base_significance_score / 100.0) * 30.0, 2)
-    quality = round((poi.quality_score / 100.0) * 10.0, 2)
-    mode_affinity = round(affinity_hint * 8.0, 2)
-    editorial_boost = float(poi.editorial.editorial_boost) if poi.editorial is not None else 0.0
-    penalties = 0.0
-    if poi.signals is not None:
-        penalties += round(poi.signals.genericity_penalty * 10.0, 2)
+    common_components = compute_non_spatial_score_components(
+        poi,
+        travel_mode=payload.travel_mode,
+    )
+    category_context = compute_category_context_components(
+        poi,
+        requested_category=payload.category,
+    )
 
     score_breakdown = {
         "route_proximity": route_proximity,
         "detour_fit": detour_fit,
         "budget_fit": budget_fit,
-        "significance": significance,
-        "quality": quality,
-        "mode_affinity": mode_affinity,
+        **common_components,
+        **category_context,
         "category_bonus": category_bonus,
         "category_intent_guardrail": category_intent_guardrail,
-        "editorial_boost": editorial_boost,
-        "penalties": -penalties,
     }
     total_score = round(sum(score_breakdown.values()), 1)
     return total_score, score_breakdown, _match_type_for_result(match_type)
@@ -167,6 +180,25 @@ def _match_type_for_result(
     return match_type
 
 
+def _passes_category_specific_eligibility(
+    requested_category: str,
+    poi: POI,
+) -> bool:
+    if requested_category != "scenic":
+        return True
+
+    raw_tags = dict(getattr(poi, "raw_tag_summary_json", {}) or {})
+    if poi.normalized_subcategory in {"overlook_vista", "landscape_feature"}:
+        return True
+    if poi.normalized_subcategory == "trail_river_access":
+        return (
+            raw_tags.get("tourism") == "viewpoint"
+            or "natural" in raw_tags
+            or "waterway" in raw_tags
+        )
+    return False
+
+
 def build_route_result(
     poi: POI,
     centroid: Point,
@@ -191,65 +223,23 @@ def build_route_result(
         secondary_categories=secondary_categories,
         category_match_type=category_match,
         coordinates=[centroid.x, centroid.y],
-        short_description=(
-            poi.editorial.editorial_description_override
-            if poi.editorial is not None and poi.editorial.editorial_description_override
-            else poi.short_description or "No editorial description yet."
-        ),
+        short_description=choose_short_description_for_poi(poi),
         distance_from_route_m=metrics.distance_from_route_m,
         estimated_detour_m=metrics.estimated_detour_m,
         estimated_extra_minutes=metrics.estimated_extra_minutes,
         score=score,
         score_breakdown=score_breakdown,
-        why_it_matters=build_why_it_matters(score_breakdown, poi, category_match),
-        badges=build_badges(metrics, poi),
+        why_it_matters=build_why_it_matters(
+            poi,
+            score_breakdown=score_breakdown,
+            category_match=category_match,
+            spatial_mode="route",
+            include_editorial_reason=True,
+        ),
+        badges=build_badges(
+            poi,
+            spatial_mode="route",
+            distance_m=metrics.distance_from_route_m,
+            estimated_detour_m=metrics.estimated_detour_m,
+        ),
     )
-
-
-def build_why_it_matters(
-    score_breakdown: dict[str, float],
-    poi: POI,
-    category_match: Literal["primary", "secondary", "mixed"],
-) -> list[str]:
-    reasons: list[str] = []
-    route_fit_total = sum(
-        score_breakdown[key] for key in ("route_proximity", "detour_fit", "budget_fit")
-    )
-    if category_match == "primary":
-        reasons.append("strong primary match for the requested category")
-    elif category_match == "secondary":
-        reasons.append("secondary category match supported by route fit")
-    if route_fit_total >= 22:
-        reasons.append("close to the route with manageable detour burden")
-    if score_breakdown["significance"] >= 18:
-        reasons.append("strong base significance for this landscape reading")
-    if poi.infrastructure_flag:
-        reasons.append("reveals civic or infrastructural traces")
-    elif poi.cultural_flag:
-        reasons.append("strong local identity and cultural legibility")
-    elif poi.scenic_flag:
-        reasons.append("offers a clear terrain or landscape read")
-    elif poi.historical_flag:
-        reasons.append("anchors local historical context")
-    if poi.editorial is not None and poi.editorial.editorial_boost > 0:
-        reasons.append("editorially boosted candidate")
-    return reasons[:3] or ["route-plausible candidate with meaningful local signal"]
-
-
-def build_badges(metrics: CandidateMetrics, poi: POI) -> list[str]:
-    badges: list[str] = []
-    if metrics.distance_from_route_m <= 150:
-        badges.append("near this route")
-    if metrics.estimated_detour_m <= 500:
-        badges.append("within budget")
-    if poi.editorial is not None and poi.editorial.editorial_status == "featured":
-        badges.append("featured")
-    if poi.infrastructure_flag:
-        badges.append("infrastructure trace")
-    elif poi.scenic_flag:
-        badges.append("scenic")
-    elif poi.cultural_flag:
-        badges.append("cultural signal")
-    elif poi.historical_flag:
-        badges.append("history")
-    return badges

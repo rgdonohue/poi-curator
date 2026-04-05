@@ -41,15 +41,27 @@ def build_overpass_query(region: RegionSpec) -> str:
 def fetch_overpass_elements(region: RegionSpec) -> list[dict[str, Any]]:
     settings = get_settings()
     query = build_overpass_query(region)
-    with httpx.Client(timeout=settings.overpass_timeout_seconds) as client:
-        response = client.post(
-            settings.overpass_url,
-            data={"data": query},
-            headers={"User-Agent": "poi-curator/0.1.0"},
-        )
-        response.raise_for_status()
-        payload = response.json()
-    return list(payload.get("elements", []))
+    endpoints = [settings.overpass_url]
+    if settings.overpass_fallback_url not in endpoints:
+        endpoints.append(settings.overpass_fallback_url)
+
+    last_error: Exception | None = None
+    for endpoint in endpoints:
+        try:
+            with httpx.Client(timeout=settings.overpass_timeout_seconds) as client:
+                response = client.post(
+                    endpoint,
+                    data={"data": query},
+                    headers={"User-Agent": "poi-curator/0.1.0"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            return list(payload.get("elements", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            last_error = exc
+
+    assert last_error is not None
+    raise last_error
 
 
 def load_overpass_elements_from_file(path: Path) -> list[dict[str, Any]]:

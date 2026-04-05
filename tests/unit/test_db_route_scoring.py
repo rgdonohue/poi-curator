@@ -213,3 +213,121 @@ def test_secondary_match_can_win_with_large_route_advantage() -> None:
     assert secondary_match == "secondary"
     assert secondary_breakdown["category_intent_guardrail"] == 0.0
     assert secondary_score > primary_score
+
+
+def test_official_corroboration_contributes_to_route_score() -> None:
+    payload = make_payload(category="history")
+    poi = cast(
+        Any,
+        SimpleNamespace(
+            normalized_category="history",
+            display_categories=["history"],
+            drive_affinity_hint=0.8,
+            walk_affinity_hint=0.5,
+            base_significance_score=70.0,
+            quality_score=70.0,
+            editorial=None,
+            signals=SimpleNamespace(
+                genericity_penalty=0.0,
+                official_corroboration_score=0.8,
+                district_membership_score=0.6,
+                institutional_identity_score=0.4,
+            ),
+        ),
+    )
+    metrics = CandidateMetrics(
+        distance_from_route_m=180,
+        estimated_detour_m=360,
+        estimated_extra_minutes=2,
+        proximity_score=12.0,
+        detour_score=11.0,
+        budget_score=3.0,
+    )
+
+    _, breakdown, _ = score_candidate(poi, payload, metrics)
+
+    assert breakdown["official_corroboration"] == 6.4
+    assert breakdown["district_membership"] == 3.0
+    assert breakdown["institutional_identity"] == 1.6
+
+
+def test_scenic_query_penalizes_generic_park_candidates() -> None:
+    payload = make_payload(category="scenic")
+    generic_park = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Cathedral Park",
+            normalized_category="scenic",
+            normalized_subcategory="trail_river_access",
+            display_categories=["scenic"],
+            raw_tag_summary_json={"name": "Cathedral Park", "leisure": "park"},
+            drive_affinity_hint=0.8,
+            walk_affinity_hint=0.5,
+            base_significance_score=55.0,
+            quality_score=70.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    overlook = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Gronquist Arroyo Overlook",
+            normalized_category="scenic",
+            normalized_subcategory="overlook_vista",
+            display_categories=["scenic", "history"],
+            raw_tag_summary_json={
+                "name": "Gronquist Arroyo Overlook",
+                "tourism": "viewpoint",
+            },
+            drive_affinity_hint=0.8,
+            walk_affinity_hint=0.5,
+            base_significance_score=55.0,
+            quality_score=70.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    metrics = CandidateMetrics(
+        distance_from_route_m=180,
+        estimated_detour_m=360,
+        estimated_extra_minutes=2,
+        proximity_score=12.0,
+        detour_score=11.0,
+        budget_score=3.0,
+    )
+
+    generic_score, generic_breakdown, _ = score_candidate(generic_park, payload, metrics)
+    overlook_score, overlook_breakdown, _ = score_candidate(overlook, payload, metrics)
+
+    assert generic_breakdown["scenic_specificity"] == -6.0
+    assert overlook_breakdown["scenic_specificity"] == 4.0
+    assert overlook_score > generic_score
+
+
+def test_category_matches_filters_generic_scenic_parks_for_scenic_requests() -> None:
+    payload = make_payload(category="scenic")
+    generic_park = cast(
+        Any,
+        SimpleNamespace(
+            normalized_category="scenic",
+            normalized_subcategory="trail_river_access",
+            display_categories=["scenic"],
+            raw_tag_summary_json={"name": "Cathedral Park", "leisure": "park"},
+        ),
+    )
+    overlook = cast(
+        Any,
+        SimpleNamespace(
+            normalized_category="scenic",
+            normalized_subcategory="overlook_vista",
+            display_categories=["scenic", "history"],
+            raw_tag_summary_json={
+                "name": "Gronquist Arroyo Overlook",
+                "tourism": "viewpoint",
+            },
+        ),
+    )
+
+    assert category_matches(payload, generic_park) is False
+    assert category_matches(payload, overlook) is True

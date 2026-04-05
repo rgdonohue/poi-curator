@@ -2,7 +2,10 @@ from fastapi import APIRouter, HTTPException
 from poi_curator_domain.categories import PUBLIC_CATEGORIES, CategoryResponse
 from poi_curator_domain.schemas import (
     AppConfigResponse,
+    NearbySuggestRequest,
+    NearbySuggestResponse,
     POIDetailResponse,
+    PointSuggestRequest,
     RouteSuggestRequest,
     RouteSuggestResponse,
 )
@@ -50,6 +53,24 @@ def route_suggest(
     backend: ScoringBackendDep,
 ) -> RouteSuggestResponse:
     return backend.suggest_places(db, payload)
+
+
+@router.post("/point/suggest", response_model=NearbySuggestResponse)
+def point_suggest(
+    payload: PointSuggestRequest,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> NearbySuggestResponse:
+    return backend.suggest_nearby_places(db, NearbySuggestRequest.from_point_request(payload))
+
+
+@router.post("/nearby/suggest", response_model=NearbySuggestResponse)
+def nearby_suggest(
+    payload: NearbySuggestRequest,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> NearbySuggestResponse:
+    return backend.suggest_nearby_places(db, payload)
 
 
 @router.get("/poi/{poi_id}", response_model=POIDetailResponse)

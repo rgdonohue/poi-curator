@@ -5,7 +5,9 @@ from poi_curator_domain.db import get_session_factory
 
 from poi_curator_scoring.backend import get_database_scoring_backend
 from poi_curator_scoring.evaluation import (
+    evaluate_cases,
     evaluate_route_fixtures,
+    load_evaluation_cases,
     load_route_fixtures,
     write_evaluation_report,
 )
@@ -45,6 +47,26 @@ def evaluate_routes(
         summary = evaluate_route_fixtures(backend, session, route_fixtures)
 
     typer.echo(f"fixtures={summary.fixture_count}")
+    typer.echo(f"passed={summary.passed_count}")
+    typer.echo(f"failed={summary.failed_count}")
+    if output is not None:
+        write_evaluation_report(output, summary)
+        typer.echo(f"report={output}")
+
+
+@app.command("cases")
+def evaluate_cases_command(
+    fixtures: Path = FIXTURES_OPTION,
+    output: Path | None = OUTPUT_OPTION,
+) -> None:
+    backend = get_database_scoring_backend()
+    cases = load_evaluation_cases(fixtures)
+
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        summary = evaluate_cases(backend, session, cases)
+
+    typer.echo(f"cases={summary.fixture_count}")
     typer.echo(f"passed={summary.passed_count}")
     typer.echo(f"failed={summary.failed_count}")
     if output is not None:

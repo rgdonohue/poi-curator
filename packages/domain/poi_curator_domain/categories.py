@@ -137,6 +137,13 @@ def public_category_for_internal_type(internal_type: str) -> str:
 
 
 def classify_osm_tags(tags: dict[str, str]) -> ClassificationResult | None:
+    if tags.get("leisure") == "park" and "plaza" in tags.get("name", "").lower():
+        return ClassificationResult(
+            internal_type="civic_space_plaza",
+            public_category="civic",
+            matched_rule_id="park_named_plaza",
+            matched_rule_tags={"leisure": "park", "name_contains": "plaza"},
+        )
     matched_rule = match_osm_rule(tags)
     if matched_rule is None:
         return None

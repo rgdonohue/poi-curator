@@ -42,3 +42,18 @@ def test_railway_yard_beats_historic_generic_for_infrastructure() -> None:
     assert classification.internal_type == "infrastructure_landmark"
     assert classification.public_category == "civic"
     assert classification.matched_rule_id == "railway_trace"
+
+
+def test_named_plaza_park_reads_as_civic_plaza() -> None:
+    tags = {
+        "name": "The Santa Fe Plaza",
+        "leisure": "park",
+        "operator:type": "government",
+    }
+
+    classification = classify_osm_tags(tags)
+
+    assert classification is not None
+    assert classification.internal_type == "civic_space_plaza"
+    assert classification.public_category == "civic"
+    assert classification.matched_rule_id == "park_named_plaza"

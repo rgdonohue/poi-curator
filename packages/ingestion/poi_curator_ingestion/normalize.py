@@ -5,6 +5,7 @@ from poi_curator_domain.categories import (
     ClassificationResult,
     classify_osm_tags,
 )
+from poi_curator_domain.descriptions import DESCRIPTION_TEMPLATES, is_low_quality_description
 from poi_curator_domain.regions import RegionSpec
 from poi_curator_domain.text import slugify
 from shapely.geometry import LineString, Point, Polygon, shape
@@ -248,11 +249,13 @@ def display_categories_for_classification(
         categories.add("art")
     if internal_type in {"overlook_vista", "trail_river_access", "landscape_feature"}:
         categories.add("scenic")
-    if any(key in tags for key in ("natural", "leisure")) or tags.get("tourism") == "viewpoint":
+    if tags.get("tourism") == "viewpoint":
         categories.add("scenic")
     if internal_type in {"civic_space_plaza", "infrastructure_landmark"}:
         categories.add("civic")
     if any(key in tags for key in ("man_made", "railway")) or tags.get("highway") == "pedestrian":
+        categories.add("civic")
+    if tags.get("historic") == "railway_station":
         categories.add("civic")
     if internal_type == "market_food_identity" or tags.get("amenity") == "marketplace":
         categories.add("food")
@@ -276,34 +279,11 @@ def display_categories_for_classification(
 
 def build_short_description(internal_type: str, tags: dict[str, str]) -> str:
     if description := tags.get("description"):
-        return description[:220]
+        normalized = description[:220].strip()
+        if not is_low_quality_description(normalized):
+            return normalized
 
-    templates = {
-        "historic_site": "Historic site with strong local landscape context.",
-        "historic_district": (
-            "Historic district that helps explain settlement patterns and continuity."
-        ),
-        "museum": "Museum or interpretive site with clear historical context.",
-        "monument_memorial": "Monument or memorial with strong public memory value.",
-        "mural_public_art": "Public artwork that reads as part of the local cultural landscape.",
-        "gallery_art_space": "Art space with strong corridor-level cultural identity.",
-        "performance_cultural_venue": (
-            "Cultural venue that signals local performance and public life."
-        ),
-        "neighborhood_corridor": (
-            "Neighborhood corridor that expresses local identity at street level."
-        ),
-        "overlook_vista": "Viewpoint with a strong terrain and settlement read.",
-        "trail_river_access": "Landscape access point with ecological or scenic value.",
-        "civic_space_plaza": "Civic space that helps explain the structure of public life.",
-        "infrastructure_landmark": (
-            "Infrastructure trace that reveals labor, circulation, or water systems."
-        ),
-        "market_food_identity": "Identity-bearing market or food place with local distinctiveness.",
-        "ritual_religious_site": "Ritual or religious site with strong cultural continuity.",
-        "landscape_feature": "Landscape feature with clear scenic or ecological legibility.",
-    }
-    return templates[internal_type]
+    return DESCRIPTION_TEMPLATES[internal_type]
 
 
 def walk_affinity_for_internal_type(internal_type: str) -> float:

@@ -14,6 +14,11 @@ class NamedPoint(BaseModel):
     coordinates: list[float] = Field(min_length=2, max_length=2)
 
 
+class LatLonPoint(BaseModel):
+    lat: float
+    lon: float
+
+
 TravelMode = Literal["driving", "walking"]
 PublicCategory = Literal["history", "culture", "art", "scenic", "food", "civic", "mixed"]
 CategoryMatchType = Literal["primary", "secondary", "mixed"]
@@ -31,10 +36,49 @@ class RouteSuggestRequest(BaseModel):
     limit: int = Field(default=5, ge=1, le=20)
 
 
+class PointSuggestRequest(BaseModel):
+    location: NamedPoint
+    travel_mode: TravelMode
+    category: PublicCategory
+    radius_meters: int = Field(gt=0)
+    region_hint: str | None = None
+    limit: int = Field(default=5, ge=1, le=20)
+
+
+class NearbySuggestRequest(BaseModel):
+    center: LatLonPoint
+    travel_mode: TravelMode
+    category: PublicCategory
+    radius_meters: int = Field(gt=0)
+    region_hint: str | None = None
+    limit: int = Field(default=10, ge=1, le=20)
+
+    @classmethod
+    def from_point_request(cls, payload: "PointSuggestRequest") -> "NearbySuggestRequest":
+        return cls(
+            center=LatLonPoint(
+                lat=payload.location.coordinates[1],
+                lon=payload.location.coordinates[0],
+            ),
+            travel_mode=payload.travel_mode,
+            category=payload.category,
+            radius_meters=payload.radius_meters,
+            region_hint=payload.region_hint,
+            limit=payload.limit,
+        )
+
+
 class QuerySummary(BaseModel):
     travel_mode: TravelMode
     category: PublicCategory
     max_detour_meters: int
+    limit: int
+
+
+class NearbyQuerySummary(BaseModel):
+    travel_mode: TravelMode
+    category: PublicCategory
+    radius_meters: int
     limit: int
 
 
@@ -60,6 +104,28 @@ class RouteSuggestResponse(BaseModel):
     results: list[RouteResult]
 
 
+class NearbyResult(BaseModel):
+    poi_id: str
+    name: str
+    primary_category: str
+    secondary_categories: list[str]
+    category_match_type: CategoryMatchType | None = None
+    coordinates: list[float]
+    short_description: str
+    distance_from_center_meters: int
+    estimated_access_m: int
+    estimated_access_minutes: int
+    score: float
+    score_breakdown: dict[str, float] | None = None
+    why_it_matters: list[str]
+    badges: list[str]
+
+
+class NearbySuggestResponse(BaseModel):
+    query_summary: NearbyQuerySummary
+    results: list[NearbyResult]
+
+
 class AppConfigResponse(BaseModel):
     supported_regions: list[str]
     supported_categories: list[str]
@@ -77,6 +143,7 @@ class POIDetailResponse(BaseModel):
     why_it_matters: list[str]
     badges: list[str]
     provenance: dict[str, Any]
+    evidence: list[dict[str, Any]] = Field(default_factory=list)
 
 
 class AdminPOIItem(BaseModel):
@@ -86,6 +153,95 @@ class AdminPOIItem(BaseModel):
     status: str
     primary_category: str
     notes: str
+
+
+class AdminPOIAliasItem(BaseModel):
+    alias_name: str
+    normalized_alias: str
+    alias_type: str
+    source: str
+    confidence: float
+    is_preferred: bool
+    notes: str | None = None
+    created_at: datetime
+
+
+class AdminPOIEvidenceItem(BaseModel):
+    source_id: str
+    source_name: str | None = None
+    source_type: str | None = None
+    trust_class: str | None = None
+    evidence_type: str
+    label: str | None = None
+    text: str | None = None
+    url: str | None = None
+    external_record_id: str | None = None
+    confidence: float
+    match_method: str | None = None
+    observed_at: datetime
+
+
+class AdminPOIEvidenceResponse(BaseModel):
+    poi_id: str
+    name: str
+    primary_category: str
+    aliases: list[AdminPOIAliasItem]
+    evidence: list[AdminPOIEvidenceItem]
+
+
+class AdminMatchDiagnosticItem(BaseModel):
+    id: int
+    source_id: str
+    source_name: str | None = None
+    source_type: str | None = None
+    region: str
+    external_record_id: str | None = None
+    external_name: str
+    normalized_name: str
+    best_candidate_poi_id: str | None = None
+    best_candidate_name: str | None = None
+    resolved_poi_id: str | None = None
+    resolved_poi_name: str | None = None
+    best_similarity: float | None = None
+    match_strategy: str | None = None
+    resolution_method: str | None = None
+    why_not_auto_linked: str
+    status: str
+    reviewed_at: datetime | None = None
+    reviewed_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminResolveDiagnosticRequest(BaseModel):
+    poi_id: str
+    reviewed_by: str | None = None
+
+
+class AdminAliasFromDiagnosticRequest(BaseModel):
+    poi_id: str
+    alias_name: str | None = None
+    alias_type: str = "register_variant"
+    is_preferred: bool = False
+    notes: str | None = None
+    reviewed_by: str | None = None
+
+
+class AdminSuppressDiagnosticRequest(BaseModel):
+    reviewed_by: str | None = None
+
+
+class AdminCreateAliasRequest(BaseModel):
+    alias_name: str
+    alias_type: str = "manual"
+    is_preferred: bool = False
+    notes: str | None = None
+
+
+class AdminAliasMutationResponse(BaseModel):
+    poi_id: str
+    alias: AdminPOIAliasItem
+    created: bool
 
 
 class AdminPOIPatchRequest(BaseModel):

@@ -76,3 +76,23 @@ def test_marketplace_normalizes_to_food_primary() -> None:
     assert normalized.normalized_category == "food"
     assert normalized.display_categories == ["food", "culture"]
     assert audit.matched_rule_id == "marketplace"
+
+
+def test_historic_railway_station_gains_civic_secondary() -> None:
+    element = {
+        "type": "node",
+        "id": 9999,
+        "lat": 35.6815,
+        "lon": -105.952,
+        "tags": {
+            "name": "Atchison, Topeka & Santa Fe Railway Depot",
+            "historic": "railway_station",
+        },
+    }
+
+    normalized, audit = normalize_osm_element_with_audit(element, get_region("santa-fe"))
+
+    assert normalized is not None
+    assert normalized.normalized_category == "history"
+    assert normalized.display_categories == ["history", "civic"]
+    assert audit.matched_rule_id == "historic_generic"

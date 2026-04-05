@@ -1,14 +1,22 @@
 from typing import Literal
 
 from poi_curator_domain.schemas import (
+    AdminMatchDiagnosticItem,
+    AdminPOIEvidenceResponse,
     AdminPOIItem,
+    NearbyQuerySummary,
+    NearbyResult,
+    NearbySuggestRequest,
+    NearbySuggestResponse,
     POIDetailResponse,
     QuerySummary,
     RouteResult,
     RouteSuggestRequest,
     RouteSuggestResponse,
 )
+from shapely.geometry import Point
 
+from poi_curator_scoring.db_route_scoring import get_metric_transformer
 from poi_curator_scoring.fixtures import FIXTURE_POIS, POIFixture
 
 
@@ -103,6 +111,98 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
     )
 
 
+def _build_nearby_fixture_results(
+    *,
+    center_lon: float,
+    center_lat: float,
+    category: str,
+    travel_mode: str,
+    radius_meters: int,
+    limit: int,
+) -> list[NearbyResult]:
+    scored_results: list[tuple[float, POIFixture, int, int]] = []
+    transformer = get_metric_transformer()
+    query_point = Point(center_lon, center_lat)
+    projected_query_point = Point(transformer.transform(*query_point.coords[0]))
+
+    for fixture in FIXTURE_POIS:
+        if category != "mixed" and (
+            fixture.primary_category != category
+            and category not in fixture.secondary_categories
+        ):
+            continue
+
+        projected_fixture = Point(
+            transformer.transform(fixture.coordinates[0], fixture.coordinates[1])
+        )
+        distance_m = int(round(projected_query_point.distance(projected_fixture)))
+        if distance_m > radius_meters:
+            continue
+
+        estimated_access_minutes = max(
+            1,
+            int(round(distance_m / (250.0 if travel_mode == "driving" else 80.0))),
+        )
+        category_bonus = 10.0 if fixture.primary_category == category else 2.5
+        proximity_bonus = max(0.0, 18.0 - (distance_m / max(radius_meters, 1)) * 18.0)
+        radius_fit = max(0.0, 12.0 - (distance_m / max(radius_meters, 1)) * 12.0)
+        score = fixture.base_score + category_bonus + _mode_bonus(travel_mode, fixture)
+        score += proximity_bonus + radius_fit
+        scored_results.append((score, fixture, distance_m, estimated_access_minutes))
+
+    scored_results.sort(key=lambda item: item[0], reverse=True)
+    return [
+        NearbyResult(
+            poi_id=fixture.poi_id,
+            name=fixture.name,
+            primary_category=fixture.primary_category,
+            secondary_categories=fixture.secondary_categories,
+            category_match_type=(
+                "mixed"
+                if category == "mixed"
+                else "primary"
+                if fixture.primary_category == category
+                else "secondary"
+            ),
+            coordinates=fixture.coordinates,
+            short_description=fixture.short_description,
+            distance_from_center_meters=distance_m,
+            estimated_access_m=distance_m,
+            estimated_access_minutes=estimated_access_minutes,
+            score=round(score, 1),
+            score_breakdown=None,
+            why_it_matters=fixture.why_it_matters,
+            badges=list(dict.fromkeys([*fixture.badges, "scaffold result"])),
+        )
+        for score, fixture, distance_m, estimated_access_minutes in scored_results[:limit]
+    ]
+
+
+def suggest_nearby_places(payload: NearbySuggestRequest) -> NearbySuggestResponse:
+    results = _build_nearby_fixture_results(
+        center_lon=payload.center.lon,
+        center_lat=payload.center.lat,
+        category=payload.category,
+        travel_mode=payload.travel_mode,
+        radius_meters=payload.radius_meters,
+        limit=payload.limit,
+    )
+
+    return NearbySuggestResponse(
+        query_summary=NearbyQuerySummary(
+            travel_mode=payload.travel_mode,
+            category=payload.category,
+            radius_meters=payload.radius_meters,
+            limit=payload.limit,
+        ),
+        results=results,
+    )
+
+
+def suggest_nearby(payload: NearbySuggestRequest) -> NearbySuggestResponse:
+    return suggest_nearby_places(payload)
+
+
 def get_poi_detail(poi_id: str) -> POIDetailResponse | None:
     fixture = next((item for item in FIXTURE_POIS if item.poi_id == poi_id), None)
     if fixture is None:
@@ -118,6 +218,7 @@ def get_poi_detail(poi_id: str) -> POIDetailResponse | None:
         why_it_matters=fixture.why_it_matters,
         badges=fixture.badges,
         provenance=fixture.provenance,
+        evidence=[],
     )
 
 
@@ -135,3 +236,27 @@ def get_admin_queue(status: str, city: str | None) -> list[AdminPOIItem]:
         for fixture in FIXTURE_POIS
         if fixture.city == requested_city
     ]
+
+
+def get_admin_poi_evidence(poi_id: str) -> AdminPOIEvidenceResponse | None:
+    fixture = next((item for item in FIXTURE_POIS if item.poi_id == poi_id), None)
+    if fixture is None:
+        return None
+    return AdminPOIEvidenceResponse(
+        poi_id=fixture.poi_id,
+        name=fixture.name,
+        primary_category=fixture.primary_category,
+        aliases=[],
+        evidence=[],
+    )
+
+
+def get_admin_match_diagnostics(
+    *,
+    region: str | None,
+    source_id: str | None,
+    status: str,
+    limit: int,
+) -> list[AdminMatchDiagnosticItem]:
+    del region, source_id, status, limit
+    return []

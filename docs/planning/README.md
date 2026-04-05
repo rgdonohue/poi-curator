@@ -12,6 +12,7 @@ The core decision is fixed:
 - `TECH_SPEC.md`: architecture, schema, ingestion, enrichment, scoring, API, and operational design
 - `IMPLEMENTATION_PLAN.md`: phased roadmap, workstreams, exit criteria, and sequencing
 - `TOOLING_AND_AGENTS.md`: recommended repo tooling, local/dev stack, CI, MCPs, agent roles, and Codex skills to add
+- `SOURCE_ECOLOGY_AND_ANCHOR_PLAN.md`: source expansion strategy, anchor reliability program, evidence schema, and phased curation roadmap
 
 ## Locked MVP Decisions
 
