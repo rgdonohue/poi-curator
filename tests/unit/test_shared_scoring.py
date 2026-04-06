@@ -97,6 +97,27 @@ def test_build_badges_supports_spatial_and_detail_contexts() -> None:
     ]
 
 
+def test_build_why_it_matters_adds_rail_theme_reason() -> None:
+    reasons = build_why_it_matters(
+        make_poi(),
+        requested_theme="rail",
+        theme_match=True,
+    )
+
+    assert reasons[0] == "historical significance signal present"
+    assert "reveals rail infrastructure or railyard corridor traces" in reasons
+
+
+def test_build_badges_adds_rail_theme_badge() -> None:
+    badges = build_badges(
+        make_poi(),
+        requested_theme="rail",
+        theme_match=True,
+    )
+
+    assert "rail theme" in badges
+
+
 def test_compute_category_context_penalizes_generic_scenic_park() -> None:
     poi = cast(
         Any,

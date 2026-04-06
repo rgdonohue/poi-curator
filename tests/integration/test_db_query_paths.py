@@ -11,8 +11,12 @@ from poi_curator_api.main import app
 from poi_curator_domain.db import (
     POI,
     POIEditorial,
+    POIEvidence,
     POISignals,
+    POISourceRaw,
+    POIThemeMembershipEvidence,
     POIThemeMembership,
+    SourceRegistry,
     get_session_factory,
 )
 from shapely.geometry import Point
@@ -35,10 +39,28 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
     near_poi_id = str(uuid4())
     secondary_poi_id = str(uuid4())
     far_poi_id = str(uuid4())
-    poi_ids = [near_poi_id, secondary_poi_id, far_poi_id]
+    rail_poi_id = str(uuid4())
+    poi_ids = [near_poi_id, secondary_poi_id, far_poi_id, rail_poi_id]
+    source_id = f"test-city-gis-railyard-{uuid4().hex[:8]}"
     now = datetime.now(UTC)
 
     with session_factory() as session:
+        session.add(
+            SourceRegistry(
+                source_id=source_id,
+                organization_name="Integration Test Source",
+                source_name="Integration Test Railyard Boundary",
+                source_type="test",
+                trust_class="official",
+                base_url=None,
+                license_notes=None,
+                crawl_allowed=False,
+                ingest_method="integration",
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
         session.add_all(
             [
                 POI(
@@ -128,6 +150,38 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     created_at=now,
                     updated_at=now,
                 ),
+                POI(
+                    poi_id=rail_poi_id,
+                    canonical_name="Integration Railway Depot",
+                    slug=f"integration-railway-depot-{region}",
+                    geom=from_shape(Point(-105.9496, 35.6819), srid=4326),
+                    centroid=from_shape(Point(-105.9496, 35.6819), srid=4326),
+                    city=region,
+                    region=region,
+                    country="USA",
+                    normalized_category="history",
+                    normalized_subcategory="historic_site",
+                    display_categories=["history", "civic"],
+                    short_description="Historic depot for integration testing.",
+                    primary_source="test",
+                    raw_tag_summary_json={
+                        "name": "Integration Railway Depot",
+                        "historic": "railway_station",
+                    },
+                    historical_flag=True,
+                    cultural_flag=False,
+                    scenic_flag=False,
+                    infrastructure_flag=False,
+                    food_identity_flag=False,
+                    walk_affinity_hint=0.8,
+                    drive_affinity_hint=0.8,
+                    base_significance_score=78.0,
+                    quality_score=82.0,
+                    review_status="needs_review",
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                ),
             ]
         )
         session.add_all(
@@ -186,7 +240,40 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     editorial_priority_seed=0.0,
                     computed_at=now,
                 ),
+                POISignals(
+                    poi_id=rail_poi_id,
+                    source_count=1,
+                    has_wikidata=False,
+                    has_wikipedia=False,
+                    has_official_heritage_match=True,
+                    official_corroboration_score=0.5,
+                    district_membership_score=0.4,
+                    institutional_identity_score=0.0,
+                    osm_tag_richness=0.5,
+                    description_quality=0.8,
+                    entity_type_confidence=0.9,
+                    local_identity_score=0.7,
+                    interpretive_value_score=0.8,
+                    genericity_penalty=0.0,
+                    editorial_priority_seed=0.0,
+                    computed_at=now,
+                ),
             ]
+        )
+        session.add(
+            POIEvidence(
+                evidence_key=f"it-railyard-boundary-{rail_poi_id}",
+                poi_id=rail_poi_id,
+                source_id=source_id,
+                evidence_type="boundary_membership",
+                evidence_label="The Railyard",
+                evidence_text="The Railyard via integration test boundary evidence.",
+                evidence_url=None,
+                external_record_id="1",
+                confidence=0.95,
+                raw_evidence_json={"label": "The Railyard", "layer_id": 93},
+                observed_at=now,
+            )
         )
         session.commit()
 
@@ -195,13 +282,25 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
         "near_poi_id": near_poi_id,
         "secondary_poi_id": secondary_poi_id,
         "far_poi_id": far_poi_id,
+        "rail_poi_id": rail_poi_id,
+        "source_id": source_id,
     }
 
     with session_factory() as session:
         session.execute(delete(POIEditorial).where(POIEditorial.poi_id.in_(poi_ids)))
+        session.execute(
+            delete(POIThemeMembershipEvidence).where(
+                POIThemeMembershipEvidence.membership_id.in_(
+                    select(POIThemeMembership.id).where(POIThemeMembership.poi_id.in_(poi_ids))
+                )
+            )
+        )
         session.execute(delete(POIThemeMembership).where(POIThemeMembership.poi_id.in_(poi_ids)))
+        session.execute(delete(POIEvidence).where(POIEvidence.poi_id.in_(poi_ids)))
+        session.execute(delete(POISourceRaw).where(POISourceRaw.canonical_poi_id.in_(poi_ids)))
         session.execute(delete(POISignals).where(POISignals.poi_id.in_(poi_ids)))
         session.execute(delete(POI).where(POI.poi_id.in_(poi_ids)))
+        session.execute(delete(SourceRegistry).where(SourceRegistry.source_id == source_id))
         session.commit()
 
 
@@ -285,6 +384,78 @@ def test_nearby_suggest_water_theme_filters_and_persists_membership(
         )
         assert membership is not None
         assert membership.status == "accepted"
+
+
+def test_nearby_suggest_rail_theme_filters_and_links_evidence(
+    db_query_fixture: dict[str, str],
+) -> None:
+    response = client.post(
+        "/v1/nearby/suggest",
+        json={
+            "center": {"lat": 35.6819, "lon": -105.9496},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "theme": "rail",
+            "radius_meters": 500,
+            "region_hint": db_query_fixture["region"],
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    result_ids = [item["poi_id"] for item in payload["results"]]
+    assert result_ids == [db_query_fixture["rail_poi_id"]]
+    assert any(
+        reason.startswith("reveals rail infrastructure or railyard corridor")
+        for reason in payload["results"][0]["why_it_matters"]
+    )
+    assert "rail theme" in payload["results"][0]["badges"]
+
+    with get_session_factory()() as session:
+        membership = session.scalar(
+            select(POIThemeMembership).where(
+                POIThemeMembership.poi_id == db_query_fixture["rail_poi_id"],
+                POIThemeMembership.theme_slug == "rail",
+            )
+        )
+        assert membership is not None
+        assert membership.status == "accepted"
+        evidence_links = session.execute(
+            select(POIThemeMembershipEvidence.poi_evidence_id).where(
+                POIThemeMembershipEvidence.membership_id == membership.id
+            )
+        ).scalars().all()
+        assert evidence_links
+
+
+def test_poi_detail_exposes_rail_theme_membership_and_evidence(
+    db_query_fixture: dict[str, str],
+) -> None:
+    response = client.get(f"/v1/poi/{db_query_fixture['rail_poi_id']}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    rail_theme = next(item for item in payload["themes"] if item["theme_slug"] == "rail")
+
+    assert rail_theme["status"] == "accepted"
+    assert rail_theme["assignment_basis"] == "mixed"
+    assert rail_theme["is_query_active"] is True
+    assert rail_theme["evidence"][0]["label"] == "The Railyard"
+
+
+def test_admin_poi_evidence_exposes_rail_theme_membership_and_evidence(
+    db_query_fixture: dict[str, str],
+) -> None:
+    response = client.get(f"/v1/admin/poi/{db_query_fixture['rail_poi_id']}/evidence")
+
+    assert response.status_code == 200
+    payload = response.json()
+    rail_theme = next(item for item in payload["themes"] if item["theme_slug"] == "rail")
+
+    assert rail_theme["status"] == "accepted"
+    assert rail_theme["assignment_basis"] == "mixed"
+    assert rail_theme["evidence"][0]["label"] == "The Railyard"
 
 
 def test_admin_poi_patch_persists_editorial_overrides(db_query_fixture: dict[str, str]) -> None:

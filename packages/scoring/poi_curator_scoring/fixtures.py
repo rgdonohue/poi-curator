@@ -123,7 +123,7 @@ FIXTURE_POIS: list[POIFixture] = [
             "solid route fit",
         ],
         provenance={"osm_id": "way/rail-yard", "wikidata_id": "Q999004"},
-        themes=[],
+        themes=["rail"],
     ),
     POIFixture(
         poi_id="poi-cross-of-the-martyrs",

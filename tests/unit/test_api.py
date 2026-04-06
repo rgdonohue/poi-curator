@@ -71,6 +71,25 @@ def test_route_suggest_endpoint_accepts_active_water_theme() -> None:
     assert payload["query_summary"]["theme"] == "water"
 
 
+def test_nearby_suggest_endpoint_accepts_active_rail_theme() -> None:
+    response = client.post(
+        "/v1/nearby/suggest",
+        json={
+            "center": {"lat": 35.6821, "lon": -105.9495},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "theme": "rail",
+            "radius_meters": 900,
+            "region_hint": "santa-fe",
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query_summary"]["theme"] == "rail"
+
+
 def test_nearby_suggest_rejects_inactive_theme() -> None:
     response = client.post(
         "/v1/nearby/suggest",
@@ -78,7 +97,7 @@ def test_nearby_suggest_rejects_inactive_theme() -> None:
             "center": {"lat": 35.687, "lon": -105.9378},
             "travel_mode": "walking",
             "category": "mixed",
-            "theme": "rail",
+            "theme": "public_memory",
             "radius_meters": 1200,
             "region_hint": "santa-fe",
             "limit": 5,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
@@ -13,8 +14,17 @@ if TYPE_CHECKING:
     from poi_curator_domain.db import POI
 
 
-WATER_SYNC_THEMES: tuple[ThemeSlug, ...] = ("water",)
 _WATER_EVIDENCE_TOKENS = ("acequia", "canal", "irrigation", "river", "water")
+_RAIL_EVIDENCE_TOKENS = ("rail", "railway", "railroad", "railyard", "rail yard", "depot")
+_RAIL_NAME_TOKENS = (
+    "railway depot",
+    "railroad depot",
+    "railway station",
+    "railroad station",
+    "railyard",
+    "rail yard",
+    "rail trail",
+)
 
 
 @dataclass(frozen=True)
@@ -85,32 +95,106 @@ def evaluate_water_theme(poi: POI) -> EvaluatedThemeMembership | None:
     )
 
 
+def evaluate_rail_theme(poi: POI) -> EvaluatedThemeMembership | None:
+    raw_tags = {str(key): str(value) for key, value in (poi.raw_tag_summary_json or {}).items()}
+    normalized_category = str(getattr(poi, "normalized_category", "") or "")
+    normalized_subcategory = str(getattr(poi, "normalized_subcategory", "") or "")
+    canonical_name = str(getattr(poi, "canonical_name", "") or "")
+    lowered_name = canonical_name.casefold()
+    alias_names = [
+        str(getattr(alias, "alias_name", "") or "").casefold()
+        for alias in getattr(poi, "aliases", []) or []
+    ]
+    name_variants = [lowered_name, *alias_names]
+
+    reasons: list[str] = []
+    confidence = 0.0
+    has_direct_rule = False
+
+    railway_value = raw_tags.get("railway")
+    if railway_value is not None:
+        has_direct_rule = True
+        confidence += 0.75
+        reasons.append(f"OSM railway signal is present ({railway_value})")
+
+    if raw_tags.get("historic") == "railway_station":
+        has_direct_rule = True
+        confidence += 0.7
+        reasons.append("OSM historic tagging identifies a railway station")
+
+    if any(token in name for token in _RAIL_NAME_TOKENS for name in name_variants) and (
+        _supports_name_only_rail_read(normalized_category, normalized_subcategory)
+    ):
+        has_direct_rule = True
+        confidence += 0.65
+        reasons.append("Canonical or alias naming explicitly references rail infrastructure")
+
+    if normalized_subcategory in {
+        "historic_site",
+        "historic_district",
+        "infrastructure_landmark",
+    } and has_direct_rule:
+        confidence += 0.05
+        reasons.append("Subtype reinforces a rail-infrastructure or depot reading")
+    elif normalized_subcategory == "trail_river_access" and any(
+        "rail trail" in name or "railyard" in name or "rail yard" in name for name in name_variants
+    ):
+        confidence += 0.05
+        reasons.append("Subtype supports a repurposed rail-corridor reading")
+
+    evidence_ids = _matching_rail_evidence_ids(poi)
+    if evidence_ids:
+        confidence += min(0.2, 0.1 * len(evidence_ids))
+        reasons.append("Linked evidence references a railyard, depot, or rail designation")
+
+    if not has_direct_rule:
+        return None
+
+    confidence = round(min(confidence, 0.95), 2)
+    return EvaluatedThemeMembership(
+        theme_slug="rail",
+        status="accepted" if confidence >= 0.6 else "candidate",
+        assignment_basis="mixed" if evidence_ids else "rule",
+        confidence=confidence,
+        rationale_summary="; ".join(dict.fromkeys(reasons)),
+        evidence_ids=tuple(evidence_ids),
+    )
+
+
+THEME_EVALUATORS: dict[ThemeSlug, Callable[[POI], EvaluatedThemeMembership | None]] = {
+    "water": evaluate_water_theme,
+    "rail": evaluate_rail_theme,
+}
+SYNC_THEMES: tuple[ThemeSlug, ...] = tuple(THEME_EVALUATORS)
+
+
 def evaluate_theme_memberships(poi: POI) -> dict[ThemeSlug, EvaluatedThemeMembership]:
     editorial_by_theme = {
         str(item.theme_slug): item for item in getattr(poi, "theme_editorials", []) or []
     }
     results: dict[ThemeSlug, EvaluatedThemeMembership] = {}
 
-    water_editorial = editorial_by_theme.get("water")
-    if water_editorial is not None and water_editorial.editorial_decision == "force_exclude":
-        return results
+    for theme_slug, evaluator in THEME_EVALUATORS.items():
+        editorial = editorial_by_theme.get(theme_slug)
+        if editorial is not None and editorial.editorial_decision == "force_exclude":
+            continue
 
-    water_membership = evaluate_water_theme(poi)
-    if water_editorial is not None and water_editorial.editorial_decision == "force_include":
-        note = water_editorial.notes or "Included by editorial review."
-        evidence_ids = water_membership.evidence_ids if water_membership is not None else ()
-        results["water"] = EvaluatedThemeMembership(
-            theme_slug="water",
-            status="accepted",
-            assignment_basis="editorial" if water_membership is None else "mixed",
-            confidence=1.0 if water_membership is None else max(water_membership.confidence, 0.9),
-            rationale_summary=note,
-            evidence_ids=evidence_ids,
-        )
-        return results
+        membership = evaluator(poi)
+        if editorial is not None and editorial.editorial_decision == "force_include":
+            note = editorial.notes or "Included by editorial review."
+            evidence_ids = membership.evidence_ids if membership is not None else ()
+            results[theme_slug] = EvaluatedThemeMembership(
+                theme_slug=theme_slug,
+                status="accepted",
+                assignment_basis="editorial" if membership is None else "mixed",
+                confidence=1.0 if membership is None else max(membership.confidence, 0.9),
+                rationale_summary=note,
+                evidence_ids=evidence_ids,
+            )
+            continue
 
-    if water_membership is not None:
-        results["water"] = water_membership
+        if membership is not None:
+            results[theme_slug] = membership
     return results
 
 
@@ -137,7 +221,7 @@ def _sync_single_poi(session: Session, poi: POI) -> bool:
         str(membership.theme_slug): membership for membership in getattr(poi, "theme_memberships", []) or []
     }
 
-    for theme_slug in WATER_SYNC_THEMES:
+    for theme_slug in SYNC_THEMES:
         evaluation = evaluated.get(theme_slug)
         membership = membership_by_slug.get(theme_slug)
         if evaluation is None:
@@ -225,7 +309,35 @@ def _matching_water_evidence_ids(poi: POI) -> list[int]:
     return evidence_ids
 
 
+def _matching_rail_evidence_ids(poi: POI) -> list[int]:
+    evidence_ids: list[int] = []
+    for evidence in getattr(poi, "evidence_items", []) or []:
+        text_parts = [
+            str(getattr(evidence, "evidence_label", "") or ""),
+            str(getattr(evidence, "evidence_text", "") or ""),
+            str(getattr(evidence, "evidence_url", "") or ""),
+            str(getattr(evidence, "external_record_id", "") or ""),
+            str(getattr(evidence, "raw_evidence_json", "") or ""),
+        ]
+        haystack = " ".join(part.casefold() for part in text_parts if part)
+        if any(token in haystack for token in _RAIL_EVIDENCE_TOKENS):
+            evidence_ids.append(int(evidence.id))
+    return evidence_ids
+
+
 def _supports_name_only_water_read(normalized_category: str, normalized_subcategory: str) -> bool:
     if normalized_subcategory in {"infrastructure_landmark", "trail_river_access"}:
         return True
     return normalized_category in {"civic", "scenic"}
+
+
+def _supports_name_only_rail_read(normalized_category: str, normalized_subcategory: str) -> bool:
+    if normalized_subcategory in {
+        "historic_site",
+        "historic_district",
+        "infrastructure_landmark",
+        "trail_river_access",
+        "neighborhood_corridor",
+    }:
+        return True
+    return normalized_category in {"history", "civic", "scenic"}

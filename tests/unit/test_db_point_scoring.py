@@ -26,6 +26,21 @@ def make_payload(category: str = "history") -> NearbySuggestRequest:
     )
 
 
+def make_rail_membership(
+    *,
+    assignment_basis: str,
+    evidence_links: list[object] | None = None,
+) -> Any:
+    return cast(
+        Any,
+        SimpleNamespace(
+            theme_slug="rail",
+            assignment_basis=assignment_basis,
+            evidence_links=evidence_links or [],
+        ),
+    )
+
+
 def test_compute_point_candidate_metrics_for_nearby_point() -> None:
     payload = make_payload()
     query_point = Point(-105.94, 35.68)
@@ -254,6 +269,68 @@ def test_civic_query_rewards_historic_rail_depot_anchor() -> None:
     assert depot_breakdown["civic_anchor_bonus"] == 10.0
     assert fragment_breakdown["civic_fragment_penalty"] == -5.0
     assert depot_score > fragment_score
+
+
+def test_mixed_rail_query_prefers_depot_anchor_over_rule_only_trace() -> None:
+    payload = make_payload(category="mixed").model_copy(update={"theme": "rail"})
+    depot = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Atchison, Topeka & Santa Fe Railway Depot",
+            normalized_category="history",
+            normalized_subcategory="historic_site",
+            display_categories=["history", "civic"],
+            raw_tag_summary_json={
+                "name": "Atchison, Topeka & Santa Fe Railway Depot",
+                "historic": "railway_station",
+            },
+            drive_affinity_hint=0.6,
+            walk_affinity_hint=0.6,
+            base_significance_score=82.0,
+            quality_score=85.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+            theme_memberships=[make_rail_membership(assignment_basis="mixed", evidence_links=[object()])],
+        ),
+    )
+    trace = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Rail Trail St. Francis Tunnel Grid Vent",
+            normalized_category="civic",
+            normalized_subcategory="infrastructure_landmark",
+            display_categories=["civic"],
+            raw_tag_summary_json={"name": "Rail Trail St. Francis Tunnel Grid Vent"},
+            drive_affinity_hint=0.6,
+            walk_affinity_hint=0.6,
+            base_significance_score=64.0,
+            quality_score=75.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+            theme_memberships=[make_rail_membership(assignment_basis="rule")],
+        ),
+    )
+    depot_metrics = PointCandidateMetrics(
+        distance_from_point_m=700,
+        estimated_access_m=700,
+        estimated_access_minutes=4,
+        proximity_score=10.1,
+        radius_fit_score=6.7,
+    )
+    trace_metrics = PointCandidateMetrics(
+        distance_from_point_m=470,
+        estimated_access_m=470,
+        estimated_access_minutes=3,
+        proximity_score=12.7,
+        radius_fit_score=8.4,
+    )
+
+    depot_score, depot_breakdown, _ = score_point_candidate(depot, payload, depot_metrics)
+    trace_score, trace_breakdown, _ = score_point_candidate(trace, payload, trace_metrics)
+
+    assert depot_breakdown["rail_anchor_bonus"] == 4.0
+    assert trace_breakdown["rail_trace_guardrail"] == -3.0
+    assert depot_score > trace_score
 
 
 def test_build_nearby_result_uses_description_hygiene_fallback() -> None:

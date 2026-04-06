@@ -15,6 +15,7 @@ from poi_curator_domain.schemas import (
     RouteSuggestRequest,
     RouteSuggestResponse,
 )
+from poi_curator_domain.themes import THEME_LABELS, is_query_theme_active, theme_badge_label, theme_explanation_reason
 from shapely.geometry import Point
 
 from poi_curator_scoring.db_route_scoring import get_metric_transformer
@@ -59,12 +60,13 @@ def _to_route_result(
 ) -> RouteResult:
     badges = [*fixture.badges, "scaffold result"]
     why_it_matters = list(fixture.why_it_matters)
-    if requested_theme == "water" and "water" in fixture.themes:
-        badges.append("water theme")
-        why_it_matters = [
-            "reveals acequia or water corridor traces",
-            *why_it_matters,
-        ]
+    if requested_theme is not None and requested_theme in fixture.themes:
+        theme_reason = theme_explanation_reason(requested_theme)
+        theme_badge = theme_badge_label(requested_theme)
+        if theme_badge is not None:
+            badges.append(theme_badge)
+        if theme_reason is not None:
+            why_it_matters = [theme_reason, *why_it_matters]
     category_match_type: Literal["primary", "mixed"] = (
         "mixed" if fixture.primary_category == "mixed" else "primary"
     )
@@ -193,8 +195,10 @@ def _build_nearby_fixture_results(
             why_it_matters=list(
                 dict.fromkeys(
                     (
-                        ["reveals acequia or water corridor traces"]
-                        if requested_theme == "water" and "water" in fixture.themes
+                        [theme_explanation_reason(requested_theme)]
+                        if requested_theme is not None
+                        and requested_theme in fixture.themes
+                        and theme_explanation_reason(requested_theme) is not None
                         else []
                     )
                     + fixture.why_it_matters
@@ -204,14 +208,32 @@ def _build_nearby_fixture_results(
                 dict.fromkeys(
                     [*fixture.badges, "scaffold result"]
                     + (
-                        ["water theme"]
-                        if requested_theme == "water" and "water" in fixture.themes
+                        [theme_badge_label(requested_theme)]
+                        if requested_theme is not None
+                        and requested_theme in fixture.themes
+                        and theme_badge_label(requested_theme) is not None
                         else []
                     )
                 )
             ),
         )
         for score, fixture, distance_m, estimated_access_minutes in scored_results[:limit]
+    ]
+
+
+def _build_fixture_theme_items(themes: list[str]) -> list[POIThemeItem]:
+    return [
+        POIThemeItem(
+            theme_slug=theme_slug,
+            label=THEME_LABELS.get(theme_slug, theme_slug),
+            status="accepted",
+            assignment_basis="rule",
+            confidence=0.9,
+            rationale_summary=f"Fixture-backed {theme_slug} landmark.",
+            is_query_active=is_query_theme_active(theme_slug),
+            evidence=[],
+        )
+        for theme_slug in themes
     ]
 
 
@@ -258,20 +280,7 @@ def get_poi_detail(poi_id: str) -> POIDetailResponse | None:
         badges=fixture.badges,
         provenance=fixture.provenance,
         evidence=[],
-        themes=[
-            POIThemeItem(
-                theme_slug="water",
-                label="Water",
-                status="accepted",
-                assignment_basis="rule",
-                confidence=0.9,
-                rationale_summary="Fixture-backed acequia landmark.",
-                is_query_active=True,
-                evidence=[],
-            )
-        ]
-        if "water" in fixture.themes
-        else [],
+        themes=_build_fixture_theme_items(fixture.themes),
     )
 
 
@@ -301,20 +310,7 @@ def get_admin_poi_evidence(poi_id: str) -> AdminPOIEvidenceResponse | None:
         primary_category=fixture.primary_category,
         aliases=[],
         evidence=[],
-        themes=[
-            POIThemeItem(
-                theme_slug="water",
-                label="Water",
-                status="accepted",
-                assignment_basis="rule",
-                confidence=0.9,
-                rationale_summary="Fixture-backed acequia landmark.",
-                is_query_active=True,
-                evidence=[],
-            )
-        ]
-        if "water" in fixture.themes
-        else [],
+        themes=_build_fixture_theme_items(fixture.themes),
     )
 
 

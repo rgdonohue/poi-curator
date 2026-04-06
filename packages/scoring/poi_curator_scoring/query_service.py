@@ -8,6 +8,7 @@ from poi_curator_domain.db import (
     OfficialMatchDiagnostic,
     POIEditorial,
     POIEvidence,
+    POIThemeMembership,
 )
 from poi_curator_domain.descriptions import choose_short_description_for_poi
 from poi_curator_domain.logging_utils import log_event
@@ -263,7 +264,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
             joinedload(POI.editorial),
             joinedload(POI.evidence_items),
             joinedload(POI.aliases),
-            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
             joinedload(POI.theme_editorials),
         )
     )
@@ -342,7 +343,7 @@ def get_admin_poi_evidence(
         .options(
             joinedload(POI.aliases),
             joinedload(POI.evidence_items).joinedload(POIEvidence.source),
-            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
             joinedload(POI.theme_editorials),
         )
     )

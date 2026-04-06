@@ -35,7 +35,7 @@ THEME_DEFINITION_SPECS: tuple[ThemeDefinitionSpec, ...] = (
             "Places that reveal rail infrastructure, labor, circulation, and adaptive reuse."
         ),
         region_scope="santa-fe",
-        is_query_active=False,
+        is_query_active=True,
     ),
     ThemeDefinitionSpec(
         theme_slug="public_memory",
@@ -53,6 +53,16 @@ THEME_DEFINITION_SPECS: tuple[ThemeDefinitionSpec, ...] = (
 THEME_LABELS: dict[ThemeSlug, str] = {
     spec.theme_slug: spec.label for spec in THEME_DEFINITION_SPECS
 }
+THEME_EXPLANATION_REASONS: dict[ThemeSlug, str] = {
+    "water": "reveals acequia or water corridor traces",
+    "rail": "reveals rail infrastructure or railyard corridor traces",
+    "public_memory": "reveals civic commemoration or staged public memory",
+}
+THEME_BADGE_LABELS: dict[ThemeSlug, str] = {
+    "water": "water theme",
+    "rail": "rail theme",
+    "public_memory": "public memory theme",
+}
 QUERY_ACTIVE_THEME_SLUGS: frozenset[ThemeSlug] = frozenset(
     spec.theme_slug for spec in THEME_DEFINITION_SPECS if spec.is_query_active
 )
@@ -60,3 +70,15 @@ QUERY_ACTIVE_THEME_SLUGS: frozenset[ThemeSlug] = frozenset(
 
 def is_query_theme_active(theme_slug: ThemeSlug) -> bool:
     return theme_slug in QUERY_ACTIVE_THEME_SLUGS
+
+
+def theme_explanation_reason(theme_slug: ThemeSlug | None) -> str | None:
+    if theme_slug is None:
+        return None
+    return THEME_EXPLANATION_REASONS.get(theme_slug)
+
+
+def theme_badge_label(theme_slug: ThemeSlug | None) -> str | None:
+    if theme_slug is None:
+        return None
+    return THEME_BADGE_LABELS.get(theme_slug)

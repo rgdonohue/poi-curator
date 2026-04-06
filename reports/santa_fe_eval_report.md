@@ -1,7 +1,7 @@
 # Santa Fe Evaluation Report
 
-- Cases: 11
-- Passed: 11
+- Cases: 14
+- Passed: 14
 - Failed: 0
 
 ## PASS nearby-acequia-water · Acequia Water Nearby
@@ -66,10 +66,37 @@
     summary: Historic site with strong local landscape context.
     breakdown: point_proximity=3.7, radius_fit=2.5, significance=20.4, quality=5.8, mode_affinity=4.4, civic_anchor_bonus=10.0
 
+## PASS nearby-railyard-rail · Railyard Rail Nearby
+- Mode: nearby
+- Purpose: Prove that the rail theme can narrow nearby suggestions to legible rail depots, districts, and repurposed corridor traces around the railyard.
+- Query: travel_mode=walking, category=mixed, theme=rail, radius_meters=900, limit=5
+- Result count: 4
+- Matched expected: Atchison, Topeka & Santa Fe Railway Depot, Denver & Rio Grande Western Railroad Depot
+- Results:
+  - Santa Fe Railyard Park (scenic) match=mixed score=48.5 distance_from_center_m=252 access_min=3
+    summary: Landscape access point with ecological or scenic value.
+    breakdown: point_proximity=13.0, radius_fit=8.6, significance=15.6, quality=6.8, mode_affinity=6.0, penalties=-1.5
+  - Atchison, Topeka & Santa Fe Railway Depot (history) match=mixed score=41.0 distance_from_center_m=707 access_min=9
+    summary: Historic site with strong local landscape context.
+    breakdown: point_proximity=3.9, radius_fit=2.6, significance=20.4, quality=5.8, mode_affinity=4.4, rail_anchor_bonus=4.0
+  - Denver & Rio Grande Western Railroad Depot (history) match=mixed score=40.7 distance_from_center_m=715 access_min=9
+    summary: Historic site with strong local landscape context.
+    breakdown: point_proximity=3.7, radius_fit=2.5, significance=20.4, quality=5.8, mode_affinity=4.4, rail_anchor_bonus=4.0
+  - Rail Trail St. Francis Tunnel Grid Vent (civic) match=mixed score=39.4 distance_from_center_m=472 access_min=6
+    summary: Infrastructure trace that reveals labor, circulation, or water systems.
+    breakdown: point_proximity=8.6, radius_fit=5.7, significance=19.2, quality=6.0, mode_affinity=4.4, penalties=-1.5
+
 ## PASS nearby-plaza-water-empty · Plaza Water Nearby Empty
 - Mode: nearby
 - Purpose: Protect honest empty behavior when a tight plaza-core query asks specifically for the water theme.
 - Query: travel_mode=walking, category=mixed, theme=water, radius_meters=250, limit=5
+- Result count: 0
+- Results: none
+
+## PASS nearby-plaza-rail-empty · Plaza Rail Nearby Empty
+- Mode: nearby
+- Purpose: Protect honest empty behavior when a plaza-core query asks specifically for the rail theme.
+- Query: travel_mode=walking, category=mixed, theme=rail, radius_meters=350, limit=5
 - Result count: 0
 - Results: none
 
@@ -136,6 +163,26 @@
   - Guadalupe Street Bridge (civic) match=primary score=46.1 distance_from_route_m=655 detour_m=1310 extra_min=5
     summary: Infrastructure trace that reveals labor, circulation, or water systems.
     breakdown: route_proximity=6.8, detour_fit=1.9, budget_fit=1.0, significance=19.2, quality=6.5, mode_affinity=7.2
+
+## PASS route-railyard-rail · Rail Corridor Theme Route
+- Mode: route
+- Purpose: Prove that the rail theme can pull route-plausible depots and rail-corridor traces without turning into generic civic or history search.
+- Query: travel_mode=walking, category=mixed, theme=rail, max_detour_meters=900, limit=5
+- Result count: 4
+- Matched expected: Atchison, Topeka & Santa Fe Railway Depot, Denver & Rio Grande Western Railroad Depot
+- Results:
+  - Atchison, Topeka & Santa Fe Railway Depot (history) match=mixed score=57.2 distance_from_route_m=185 detour_m=370 extra_min=5
+    summary: Historic site with strong local landscape context.
+    breakdown: route_proximity=11.2, detour_fit=8.8, budget_fit=2.7, significance=20.4, quality=5.8, mode_affinity=4.4
+  - Denver & Rio Grande Western Railroad Depot (history) match=mixed score=56.6 distance_from_route_m=196 detour_m=392 extra_min=5
+    summary: Historic site with strong local landscape context.
+    breakdown: route_proximity=10.9, detour_fit=8.5, budget_fit=2.7, significance=20.4, quality=5.8, mode_affinity=4.4
+  - Rail Trail St. Francis Tunnel Grid Vent (civic) match=mixed score=52.2 distance_from_route_m=119 detour_m=238 extra_min=3
+    summary: Infrastructure trace that reveals labor, circulation, or water systems.
+    breakdown: route_proximity=12.5, detour_fit=11.0, budget_fit=3.6, significance=19.2, quality=6.0, mode_affinity=4.4
+  - Santa Fe Railyard Park (scenic) match=mixed score=49.3 distance_from_route_m=189 detour_m=378 extra_min=5
+    summary: Landscape access point with ecological or scenic value.
+    breakdown: route_proximity=11.1, detour_fit=8.7, budget_fit=2.7, significance=15.6, quality=6.8, mode_affinity=6.0
 
 ## PASS route-arts-corridor-walk · Arts Corridor Walk
 - Mode: route

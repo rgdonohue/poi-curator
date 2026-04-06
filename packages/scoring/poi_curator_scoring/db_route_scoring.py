@@ -18,6 +18,7 @@ from poi_curator_scoring.shared_scoring import (
     build_why_it_matters,
     compute_category_context_components,
     compute_non_spatial_score_components,
+    compute_theme_context_components,
 )
 
 
@@ -135,6 +136,11 @@ def score_candidate(
         poi,
         requested_category=payload.category,
     )
+    theme_context = compute_theme_context_components(
+        poi,
+        requested_category=payload.category,
+        requested_theme=payload.theme,
+    )
 
     score_breakdown = {
         "route_proximity": route_proximity,
@@ -142,6 +148,7 @@ def score_candidate(
         "budget_fit": budget_fit,
         **common_components,
         **category_context,
+        **theme_context,
         "category_bonus": category_bonus,
         "category_intent_guardrail": category_intent_guardrail,
     }
@@ -237,7 +244,7 @@ def build_route_result(
             spatial_mode="route",
             include_editorial_reason=True,
             requested_theme=requested_theme,
-            theme_match=requested_theme == "water",
+            theme_match=requested_theme is not None,
         ),
         badges=build_badges(
             poi,
@@ -245,6 +252,6 @@ def build_route_result(
             distance_m=metrics.distance_from_route_m,
             estimated_detour_m=metrics.estimated_detour_m,
             requested_theme=requested_theme,
-            theme_match=requested_theme == "water",
+            theme_match=requested_theme is not None,
         ),
     )

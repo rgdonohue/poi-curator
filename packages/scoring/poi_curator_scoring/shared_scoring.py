@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Literal
 
 from poi_curator_domain.db import POI
+from poi_curator_domain.themes import theme_badge_label, theme_explanation_reason
 
 
 @dataclass(frozen=True)
@@ -138,6 +139,27 @@ def compute_category_context_components(
     }
 
 
+def compute_theme_context_components(
+    poi: POI,
+    *,
+    requested_category: str,
+    requested_theme: str | None,
+) -> dict[str, float]:
+    rail_anchor_bonus = 0.0
+    rail_trace_guardrail = 0.0
+
+    if requested_theme == "rail" and requested_category == "mixed":
+        if _is_rail_anchor(poi):
+            rail_anchor_bonus = 4.0
+        elif _is_rule_only_rail_trace(poi):
+            rail_trace_guardrail = -3.0
+
+    return {
+        "rail_anchor_bonus": rail_anchor_bonus,
+        "rail_trace_guardrail": rail_trace_guardrail,
+    }
+
+
 def build_why_it_matters(
     poi: POI,
     *,
@@ -171,8 +193,10 @@ def build_why_it_matters(
         fit_total = sum(float(score_breakdown.get(key, 0.0)) for key in fit_keys)
         if fit_total >= fit_threshold:
             reasons.append(fit_reason)
-        if requested_theme == "water" and theme_match:
-            reasons.append("reveals acequia or water corridor traces")
+        if theme_match:
+            theme_reason = theme_explanation_reason(requested_theme)
+            if theme_reason is not None:
+                reasons.append(theme_reason)
 
         if float(score_breakdown.get("significance", 0.0)) >= 18:
             reasons.append("strong base significance for this landscape reading")
@@ -206,8 +230,10 @@ def build_why_it_matters(
 
     if poi.historical_flag:
         reasons.append("historical significance signal present")
-    if requested_theme == "water" and theme_match:
-        reasons.append("reveals acequia or water corridor traces")
+    if theme_match:
+        theme_reason = theme_explanation_reason(requested_theme)
+        if theme_reason is not None:
+            reasons.append(theme_reason)
     if poi.cultural_flag:
         reasons.append("strong local identity or cultural context")
     if poi.infrastructure_flag:
@@ -251,8 +277,10 @@ def build_badges(
         getattr(poi.signals, "official_corroboration_score", 0.0)
     ) >= 0.7:
         badges.append("officially corroborated")
-    if requested_theme == "water" and theme_match:
-        badges.append("water theme")
+    if theme_match:
+        theme_badge = theme_badge_label(requested_theme)
+        if theme_badge is not None:
+            badges.append(theme_badge)
 
     if spatial_mode is None:
         if poi.historical_flag:
@@ -274,3 +302,43 @@ def build_badges(
     elif poi.historical_flag:
         badges.append("history")
     return badges
+
+
+def _is_rail_anchor(poi: POI) -> bool:
+    raw_tags = dict(getattr(poi, "raw_tag_summary_json", {}) or {})
+    name = str(getattr(poi, "canonical_name", "") or "").casefold()
+    normalized_subcategory = str(getattr(poi, "normalized_subcategory", "") or "")
+
+    if raw_tags.get("historic") == "railway_station":
+        return True
+    if raw_tags.get("railway") in {"station", "yard"}:
+        return True
+    if "depot" in name or "station" in name:
+        return True
+    if (
+        "railyard" in name or "rail yard" in name
+    ) and normalized_subcategory in {"historic_district", "infrastructure_landmark"}:
+        return True
+    return False
+
+
+def _is_rule_only_rail_trace(poi: POI) -> bool:
+    normalized_subcategory = str(getattr(poi, "normalized_subcategory", "") or "")
+    if normalized_subcategory not in {"infrastructure_landmark", "trail_river_access"}:
+        return False
+    if _is_rail_anchor(poi):
+        return False
+
+    rail_membership = next(
+        (
+            membership
+            for membership in getattr(poi, "theme_memberships", []) or []
+            if getattr(membership, "theme_slug", None) == "rail"
+        ),
+        None,
+    )
+    if rail_membership is None:
+        return False
+    if getattr(rail_membership, "assignment_basis", None) != "rule":
+        return False
+    return len(getattr(rail_membership, "evidence_links", []) or []) == 0
