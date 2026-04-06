@@ -96,3 +96,51 @@ def test_historic_railway_station_gains_civic_secondary() -> None:
     assert normalized.normalized_category == "history"
     assert normalized.display_categories == ["history", "civic"]
     assert audit.matched_rule_id == "historic_generic"
+
+
+def test_acequia_named_mural_normalizes_to_civic_with_art_secondary() -> None:
+    element = {
+        "type": "node",
+        "id": 10000,
+        "lat": 35.6828,
+        "lon": -105.9319,
+        "tags": {
+            "name": "Acequia Madre",
+            "tourism": "artwork",
+            "artwork_type": "mural",
+        },
+    }
+
+    normalized, audit = normalize_osm_element_with_audit(element, get_region("santa-fe"))
+
+    assert normalized is not None
+    assert normalized.normalized_category == "civic"
+    assert normalized.normalized_subcategory == "infrastructure_landmark"
+    assert normalized.display_categories == ["civic", "art"]
+    assert normalized.short_description == (
+        "Infrastructure trace that reveals labor, circulation, or water systems."
+    )
+    assert audit.matched_rule_id == "acequia_named_artwork_override"
+
+
+def test_waterway_trace_normalizes_to_civic_primary() -> None:
+    element = {
+        "type": "way",
+        "id": 10001,
+        "geometry": [
+            {"lat": 35.6826, "lon": -105.9321},
+            {"lat": 35.6829, "lon": -105.9318},
+        ],
+        "tags": {
+            "name": "Acequia Trail Crossing",
+            "waterway": "stream",
+        },
+    }
+
+    normalized, audit = normalize_osm_element_with_audit(element, get_region("santa-fe"))
+
+    assert normalized is not None
+    assert normalized.normalized_category == "civic"
+    assert normalized.normalized_subcategory == "infrastructure_landmark"
+    assert normalized.display_categories == ["civic"]
+    assert audit.matched_rule_id == "waterway_trace"

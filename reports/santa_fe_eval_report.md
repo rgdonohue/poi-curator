@@ -1,8 +1,19 @@
 # Santa Fe Evaluation Report
 
-- Cases: 8
-- Passed: 8
+- Cases: 11
+- Passed: 11
 - Failed: 0
+
+## PASS nearby-acequia-water · Acequia Water Nearby
+- Mode: nearby
+- Purpose: Prove that the water theme can narrow nearby suggestions to acequia-linked landscape traces.
+- Query: travel_mode=walking, category=mixed, theme=water, radius_meters=500, limit=5
+- Result count: 1
+- Matched expected: Acequia Madre
+- Results:
+  - Acequia Madre (civic) match=mixed score=33.2 distance_from_center_m=415 access_min=5
+    summary: Infrastructure trace that reveals labor, circulation, or water systems.
+    breakdown: point_proximity=3.1, radius_fit=2.0, significance=19.2, quality=6.0, mode_affinity=4.4, penalties=-1.5
 
 ## PASS nearby-plaza-history · Plaza-Core History Nearby
 - Mode: nearby
@@ -55,12 +66,30 @@
     summary: Historic site with strong local landscape context.
     breakdown: point_proximity=3.7, radius_fit=2.5, significance=20.4, quality=5.8, mode_affinity=4.4, civic_anchor_bonus=10.0
 
+## PASS nearby-plaza-water-empty · Plaza Water Nearby Empty
+- Mode: nearby
+- Purpose: Protect honest empty behavior when a tight plaza-core query asks specifically for the water theme.
+- Query: travel_mode=walking, category=mixed, theme=water, radius_meters=250, limit=5
+- Result count: 0
+- Results: none
+
 ## PASS nearby-downtown-scenic-empty · Downtown Scenic Nearby Empty
 - Mode: nearby
 - Purpose: Protect honest empty behavior when a tight scenic query in the downtown core has no meaningful answer.
 - Query: travel_mode=walking, category=scenic, radius_meters=350, limit=5
 - Result count: 0
 - Results: none
+
+## PASS route-acequia-water · Acequia Water Route
+- Mode: route
+- Purpose: Prove that the water theme can pull route-plausible acequia and water-linked traces without turning into generic civic search.
+- Query: travel_mode=walking, category=mixed, theme=water, max_detour_meters=600, limit=5
+- Result count: 1
+- Matched expected: Acequia Madre
+- Results:
+  - Acequia Madre (civic) match=mixed score=62.8 distance_from_route_m=1 detour_m=2 extra_min=1
+    summary: Infrastructure trace that reveals labor, circulation, or water systems.
+    breakdown: route_proximity=15.0, detour_fit=14.9, budget_fit=4.7, significance=19.2, quality=6.0, mode_affinity=4.4
 
 ## PASS route-historic-center-driving · Historic Center Driving
 - Mode: route

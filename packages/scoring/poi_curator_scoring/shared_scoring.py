@@ -145,6 +145,8 @@ def build_why_it_matters(
     category_match: CategoryMatchResult | None = None,
     spatial_mode: SpatialExplanationMode | None = None,
     include_editorial_reason: bool = False,
+    requested_theme: str | None = None,
+    theme_match: bool = False,
 ) -> list[str]:
     reasons: list[str] = []
 
@@ -169,6 +171,8 @@ def build_why_it_matters(
         fit_total = sum(float(score_breakdown.get(key, 0.0)) for key in fit_keys)
         if fit_total >= fit_threshold:
             reasons.append(fit_reason)
+        if requested_theme == "water" and theme_match:
+            reasons.append("reveals acequia or water corridor traces")
 
         if float(score_breakdown.get("significance", 0.0)) >= 18:
             reasons.append("strong base significance for this landscape reading")
@@ -202,6 +206,8 @@ def build_why_it_matters(
 
     if poi.historical_flag:
         reasons.append("historical significance signal present")
+    if requested_theme == "water" and theme_match:
+        reasons.append("reveals acequia or water corridor traces")
     if poi.cultural_flag:
         reasons.append("strong local identity or cultural context")
     if poi.infrastructure_flag:
@@ -221,6 +227,8 @@ def build_badges(
     estimated_detour_m: int | None = None,
     travel_mode: str | None = None,
     include_source_badges: bool = False,
+    requested_theme: str | None = None,
+    theme_match: bool = False,
 ) -> list[str]:
     badges: list[str] = []
 
@@ -243,6 +251,8 @@ def build_badges(
         getattr(poi.signals, "official_corroboration_score", 0.0)
     ) >= 0.7:
         badges.append("officially corroborated")
+    if requested_theme == "water" and theme_match:
+        badges.append("water theme")
 
     if spatial_mode is None:
         if poi.historical_flag:

@@ -12,6 +12,7 @@ OVERPASS_FILTERS: list[tuple[str, str | None]] = [
     ("amenity", "theatre|marketplace|place_of_worship"),
     ("place", "neighbourhood"),
     ("man_made", None),
+    ("waterway", None),
     ("natural", None),
     ("leisure", "park"),
     ("highway", "pedestrian"),

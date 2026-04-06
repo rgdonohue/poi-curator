@@ -206,6 +206,7 @@ def build_route_result(
     score: float,
     score_breakdown: dict[str, float],
     category_match: Literal["primary", "secondary", "mixed"],
+    requested_theme: str | None = None,
 ) -> RouteResult:
     secondary_categories = [
         category for category in poi.display_categories if category != poi.normalized_category
@@ -235,11 +236,15 @@ def build_route_result(
             category_match=category_match,
             spatial_mode="route",
             include_editorial_reason=True,
+            requested_theme=requested_theme,
+            theme_match=requested_theme == "water",
         ),
         badges=build_badges(
             poi,
             spatial_mode="route",
             distance_m=metrics.distance_from_route_m,
             estimated_detour_m=metrics.estimated_detour_m,
+            requested_theme=requested_theme,
+            theme_match=requested_theme == "water",
         ),
     )

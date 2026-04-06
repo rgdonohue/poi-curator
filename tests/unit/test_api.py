@@ -46,6 +46,50 @@ def test_route_suggest_endpoint() -> None:
     assert len(payload["results"]) >= 1
 
 
+def test_route_suggest_endpoint_accepts_active_water_theme() -> None:
+    response = client.post(
+        "/v1/route/suggest",
+        json={
+            "route_geometry": {
+                "type": "LineString",
+                "coordinates": [[-105.9345, 35.6812], [-105.9308, 35.6842]],
+            },
+            "origin": {"name": "Acequia West", "coordinates": [-105.9345, 35.6812]},
+            "destination": {"name": "Acequia East", "coordinates": [-105.9308, 35.6842]},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "theme": "water",
+            "max_detour_meters": 450,
+            "max_extra_minutes": 8,
+            "region_hint": "santa-fe",
+            "limit": 3,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["query_summary"]["theme"] == "water"
+
+
+def test_nearby_suggest_rejects_inactive_theme() -> None:
+    response = client.post(
+        "/v1/nearby/suggest",
+        json={
+            "center": {"lat": 35.687, "lon": -105.9378},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "theme": "rail",
+            "radius_meters": 1200,
+            "region_hint": "santa-fe",
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert "not yet active for query use" in str(payload["detail"])
+
+
 def test_point_suggest_endpoint() -> None:
     response = client.post(
         "/v1/point/suggest",
@@ -112,6 +156,7 @@ def test_poi_detail_endpoint_includes_evidence_field() -> None:
     payload = response.json()
     assert payload["poi_id"] == "poi-santa-fe-plaza"
     assert "evidence" in payload
+    assert "themes" in payload
 
 
 def test_admin_poi_evidence_endpoint() -> None:
@@ -122,6 +167,7 @@ def test_admin_poi_evidence_endpoint() -> None:
     assert payload["poi_id"] == "poi-santa-fe-plaza"
     assert "aliases" in payload
     assert "evidence" in payload
+    assert "themes" in payload
 
 
 def test_admin_match_diagnostics_endpoint() -> None:

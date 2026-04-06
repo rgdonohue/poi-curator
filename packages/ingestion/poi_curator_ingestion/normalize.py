@@ -247,6 +247,12 @@ def display_categories_for_classification(
         categories.add("culture")
     if internal_type in {"mural_public_art", "gallery_art_space"}:
         categories.add("art")
+    if (
+        tags.get("tourism") == "artwork"
+        and classification.internal_type == "infrastructure_landmark"
+        and "acequia" in tags.get("name", "").casefold()
+    ):
+        categories.add("art")
     if internal_type in {"overlook_vista", "trail_river_access", "landscape_feature"}:
         categories.add("scenic")
     if tags.get("tourism") == "viewpoint":

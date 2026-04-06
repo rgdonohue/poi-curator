@@ -8,9 +8,15 @@ import pytest
 from fastapi.testclient import TestClient
 from geoalchemy2.shape import from_shape
 from poi_curator_api.main import app
-from poi_curator_domain.db import POI, POIEditorial, POISignals, get_session_factory
+from poi_curator_domain.db import (
+    POI,
+    POIEditorial,
+    POISignals,
+    POIThemeMembership,
+    get_session_factory,
+)
 from shapely.geometry import Point
-from sqlalchemy import delete, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 
 client = TestClient(app)
@@ -49,7 +55,7 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     display_categories=["history"],
                     short_description="Historic site for integration testing.",
                     primary_source="test",
-                    raw_tag_summary_json={},
+                    raw_tag_summary_json={"name": "Integration Acequia House", "man_made": "canal"},
                     historical_flag=True,
                     cultural_flag=False,
                     scenic_flag=False,
@@ -193,6 +199,7 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
 
     with session_factory() as session:
         session.execute(delete(POIEditorial).where(POIEditorial.poi_id.in_(poi_ids)))
+        session.execute(delete(POIThemeMembership).where(POIThemeMembership.poi_id.in_(poi_ids)))
         session.execute(delete(POISignals).where(POISignals.poi_id.in_(poi_ids)))
         session.execute(delete(POI).where(POI.poi_id.in_(poi_ids)))
         session.commit()
@@ -244,6 +251,40 @@ def test_route_suggest_uses_db_backed_pois(db_query_fixture: dict[str, str]) -> 
     assert db_query_fixture["near_poi_id"] in result_ids
     assert db_query_fixture["far_poi_id"] not in result_ids
     assert payload["results"][0]["score_breakdown"] is not None
+
+
+def test_nearby_suggest_water_theme_filters_and_persists_membership(
+    db_query_fixture: dict[str, str],
+) -> None:
+    response = client.post(
+        "/v1/nearby/suggest",
+        json={
+            "center": {"lat": 35.6870, "lon": -105.9380},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "theme": "water",
+            "radius_meters": 500,
+            "region_hint": db_query_fixture["region"],
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    result_ids = [item["poi_id"] for item in payload["results"]]
+    assert result_ids == [db_query_fixture["near_poi_id"]]
+    assert any(reason.startswith("reveals acequia or water corridor") for reason in payload["results"][0]["why_it_matters"])
+    assert "water theme" in payload["results"][0]["badges"]
+
+    with get_session_factory()() as session:
+        membership = session.scalar(
+            select(POIThemeMembership).where(
+                POIThemeMembership.poi_id == db_query_fixture["near_poi_id"],
+                POIThemeMembership.theme_slug == "water",
+            )
+        )
+        assert membership is not None
+        assert membership.status == "accepted"
 
 
 def test_admin_poi_patch_persists_editorial_overrides(db_query_fixture: dict[str, str]) -> None:

@@ -8,6 +8,7 @@ from poi_curator_domain.schemas import (
     NearbyResult,
     NearbySuggestRequest,
     NearbySuggestResponse,
+    POIThemeItem,
     POIDetailResponse,
     QuerySummary,
     RouteResult,
@@ -50,8 +51,20 @@ def _route_fit_bonus(fixture: POIFixture) -> float:
     return max(0.0, 12.0 - fixture.distance_from_route_m / 40.0)
 
 
-def _to_route_result(fixture: POIFixture, score: float) -> RouteResult:
-    badges = list(dict.fromkeys([*fixture.badges, "scaffold result"]))
+def _to_route_result(
+    fixture: POIFixture,
+    score: float,
+    *,
+    requested_theme: str | None = None,
+) -> RouteResult:
+    badges = [*fixture.badges, "scaffold result"]
+    why_it_matters = list(fixture.why_it_matters)
+    if requested_theme == "water" and "water" in fixture.themes:
+        badges.append("water theme")
+        why_it_matters = [
+            "reveals acequia or water corridor traces",
+            *why_it_matters,
+        ]
     category_match_type: Literal["primary", "mixed"] = (
         "mixed" if fixture.primary_category == "mixed" else "primary"
     )
@@ -67,8 +80,8 @@ def _to_route_result(fixture: POIFixture, score: float) -> RouteResult:
         estimated_detour_m=fixture.estimated_detour_m,
         estimated_extra_minutes=fixture.estimated_extra_minutes,
         score=round(score, 1),
-        why_it_matters=fixture.why_it_matters,
-        badges=badges,
+        why_it_matters=list(dict.fromkeys(why_it_matters))[:3],
+        badges=list(dict.fromkeys(badges)),
     )
 
 
@@ -76,6 +89,8 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
     scored_results: list[tuple[float, POIFixture]] = []
 
     for fixture in FIXTURE_POIS:
+        if payload.theme is not None and payload.theme not in fixture.themes:
+            continue
         category_bonus = _category_bonus(payload.category, fixture)
         budget_bonus = _budget_bonus(
             payload.max_detour_meters,
@@ -96,7 +111,7 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
 
     scored_results.sort(key=lambda item: item[0], reverse=True)
     results = [
-        _to_route_result(fixture, score)
+        _to_route_result(fixture, score, requested_theme=payload.theme)
         for score, fixture in scored_results[: payload.limit]
     ]
 
@@ -104,6 +119,7 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
         query_summary=QuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
+            theme=payload.theme,
             max_detour_meters=payload.max_detour_meters,
             limit=payload.limit,
         ),
@@ -119,6 +135,7 @@ def _build_nearby_fixture_results(
     travel_mode: str,
     radius_meters: int,
     limit: int,
+    requested_theme: str | None = None,
 ) -> list[NearbyResult]:
     scored_results: list[tuple[float, POIFixture, int, int]] = []
     transformer = get_metric_transformer()
@@ -130,6 +147,8 @@ def _build_nearby_fixture_results(
             fixture.primary_category != category
             and category not in fixture.secondary_categories
         ):
+            continue
+        if requested_theme is not None and requested_theme not in fixture.themes:
             continue
 
         projected_fixture = Point(
@@ -171,8 +190,26 @@ def _build_nearby_fixture_results(
             estimated_access_minutes=estimated_access_minutes,
             score=round(score, 1),
             score_breakdown=None,
-            why_it_matters=fixture.why_it_matters,
-            badges=list(dict.fromkeys([*fixture.badges, "scaffold result"])),
+            why_it_matters=list(
+                dict.fromkeys(
+                    (
+                        ["reveals acequia or water corridor traces"]
+                        if requested_theme == "water" and "water" in fixture.themes
+                        else []
+                    )
+                    + fixture.why_it_matters
+                )
+            )[:3],
+            badges=list(
+                dict.fromkeys(
+                    [*fixture.badges, "scaffold result"]
+                    + (
+                        ["water theme"]
+                        if requested_theme == "water" and "water" in fixture.themes
+                        else []
+                    )
+                )
+            ),
         )
         for score, fixture, distance_m, estimated_access_minutes in scored_results[:limit]
     ]
@@ -186,12 +223,14 @@ def suggest_nearby_places(payload: NearbySuggestRequest) -> NearbySuggestRespons
         travel_mode=payload.travel_mode,
         radius_meters=payload.radius_meters,
         limit=payload.limit,
+        requested_theme=payload.theme,
     )
 
     return NearbySuggestResponse(
         query_summary=NearbyQuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
+            theme=payload.theme,
             radius_meters=payload.radius_meters,
             limit=payload.limit,
         ),
@@ -219,6 +258,20 @@ def get_poi_detail(poi_id: str) -> POIDetailResponse | None:
         badges=fixture.badges,
         provenance=fixture.provenance,
         evidence=[],
+        themes=[
+            POIThemeItem(
+                theme_slug="water",
+                label="Water",
+                status="accepted",
+                assignment_basis="rule",
+                confidence=0.9,
+                rationale_summary="Fixture-backed acequia landmark.",
+                is_query_active=True,
+                evidence=[],
+            )
+        ]
+        if "water" in fixture.themes
+        else [],
     )
 
 
@@ -248,6 +301,20 @@ def get_admin_poi_evidence(poi_id: str) -> AdminPOIEvidenceResponse | None:
         primary_category=fixture.primary_category,
         aliases=[],
         evidence=[],
+        themes=[
+            POIThemeItem(
+                theme_slug="water",
+                label="Water",
+                status="accepted",
+                assignment_basis="rule",
+                confidence=0.9,
+                rationale_summary="Fixture-backed acequia landmark.",
+                is_query_active=True,
+                evidence=[],
+            )
+        ]
+        if "water" in fixture.themes
+        else [],
     )
 
 

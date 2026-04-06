@@ -14,6 +14,28 @@ def test_infer_mural_internal_type() -> None:
     assert public_category_for_internal_type(internal_type) == "art"
 
 
+def test_acequia_named_mural_reads_as_infrastructure() -> None:
+    tags = {"tourism": "artwork", "artwork_type": "mural", "name": "Acequia Madre"}
+
+    classification = classify_osm_tags(tags)
+
+    assert classification is not None
+    assert classification.internal_type == "infrastructure_landmark"
+    assert classification.public_category == "civic"
+    assert classification.matched_rule_id == "acequia_named_artwork_override"
+
+
+def test_waterway_trace_reads_as_infrastructure() -> None:
+    tags = {"name": "Acequia Trail Crossing", "waterway": "stream"}
+
+    classification = classify_osm_tags(tags)
+
+    assert classification is not None
+    assert classification.internal_type == "infrastructure_landmark"
+    assert classification.public_category == "civic"
+    assert classification.matched_rule_id == "waterway_trace"
+
+
 def test_viewpoint_beats_historic_memorial_for_overlook() -> None:
     tags = {
         "name": "Cross of the Martyrs Overlook",

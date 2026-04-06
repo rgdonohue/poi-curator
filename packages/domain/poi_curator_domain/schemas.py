@@ -1,7 +1,9 @@
 from datetime import datetime
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+from poi_curator_domain.themes import ThemeSlug, is_query_theme_active
 
 
 class GeoLineString(BaseModel):
@@ -30,28 +32,52 @@ class RouteSuggestRequest(BaseModel):
     destination: NamedPoint
     travel_mode: TravelMode
     category: PublicCategory
+    theme: ThemeSlug | None = None
     max_detour_meters: int = Field(gt=0)
     max_extra_minutes: int = Field(gt=0)
     region_hint: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("theme")
+    @classmethod
+    def validate_active_theme(cls, value: ThemeSlug | None) -> ThemeSlug | None:
+        if value is not None and not is_query_theme_active(value):
+            raise ValueError(f"Theme '{value}' is defined but not yet active for query use.")
+        return value
 
 
 class PointSuggestRequest(BaseModel):
     location: NamedPoint
     travel_mode: TravelMode
     category: PublicCategory
+    theme: ThemeSlug | None = None
     radius_meters: int = Field(gt=0)
     region_hint: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
+
+    @field_validator("theme")
+    @classmethod
+    def validate_active_theme(cls, value: ThemeSlug | None) -> ThemeSlug | None:
+        if value is not None and not is_query_theme_active(value):
+            raise ValueError(f"Theme '{value}' is defined but not yet active for query use.")
+        return value
 
 
 class NearbySuggestRequest(BaseModel):
     center: LatLonPoint
     travel_mode: TravelMode
     category: PublicCategory
+    theme: ThemeSlug | None = None
     radius_meters: int = Field(gt=0)
     region_hint: str | None = None
     limit: int = Field(default=10, ge=1, le=20)
+
+    @field_validator("theme")
+    @classmethod
+    def validate_active_theme(cls, value: ThemeSlug | None) -> ThemeSlug | None:
+        if value is not None and not is_query_theme_active(value):
+            raise ValueError(f"Theme '{value}' is defined but not yet active for query use.")
+        return value
 
     @classmethod
     def from_point_request(cls, payload: "PointSuggestRequest") -> "NearbySuggestRequest":
@@ -62,6 +88,7 @@ class NearbySuggestRequest(BaseModel):
             ),
             travel_mode=payload.travel_mode,
             category=payload.category,
+            theme=payload.theme,
             radius_meters=payload.radius_meters,
             region_hint=payload.region_hint,
             limit=payload.limit,
@@ -71,6 +98,7 @@ class NearbySuggestRequest(BaseModel):
 class QuerySummary(BaseModel):
     travel_mode: TravelMode
     category: PublicCategory
+    theme: ThemeSlug | None = None
     max_detour_meters: int
     limit: int
 
@@ -78,8 +106,29 @@ class QuerySummary(BaseModel):
 class NearbyQuerySummary(BaseModel):
     travel_mode: TravelMode
     category: PublicCategory
+    theme: ThemeSlug | None = None
     radius_meters: int
     limit: int
+
+
+class ThemeEvidenceReference(BaseModel):
+    evidence_id: int
+    source_id: str
+    evidence_type: str
+    label: str | None = None
+    confidence: float
+
+
+class POIThemeItem(BaseModel):
+    theme_slug: ThemeSlug
+    label: str
+    status: str
+    assignment_basis: str
+    confidence: float
+    rationale_summary: str | None = None
+    is_query_active: bool
+    editorial_decision: str | None = None
+    evidence: list[ThemeEvidenceReference] = Field(default_factory=list)
 
 
 class RouteResult(BaseModel):
@@ -144,6 +193,7 @@ class POIDetailResponse(BaseModel):
     badges: list[str]
     provenance: dict[str, Any]
     evidence: list[dict[str, Any]] = Field(default_factory=list)
+    themes: list[POIThemeItem] = Field(default_factory=list)
 
 
 class AdminPOIItem(BaseModel):
@@ -187,6 +237,7 @@ class AdminPOIEvidenceResponse(BaseModel):
     primary_category: str
     aliases: list[AdminPOIAliasItem]
     evidence: list[AdminPOIEvidenceItem]
+    themes: list[POIThemeItem] = Field(default_factory=list)
 
 
 class AdminMatchDiagnosticItem(BaseModel):

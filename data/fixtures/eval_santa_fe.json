@@ -1,6 +1,26 @@
 {
   "cases": [
     {
+      "id": "nearby-acequia-water",
+      "label": "Acequia Water Nearby",
+      "mode": "nearby",
+      "purpose": "Prove that the water theme can narrow nearby suggestions to acequia-linked landscape traces.",
+      "category": "mixed",
+      "theme": "water",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "center": { "lat": 35.6829, "lon": -105.9320 },
+      "radius_meters": 500,
+      "expectations": {
+        "expected_empty": false,
+        "expected_any_names": ["Acequia Madre", "Acequia Trail Crossing"],
+        "forbidden_names": ["The Santa Fe Plaza", "Palace of the Governors"],
+        "preferred_top_names": ["Acequia Madre"],
+        "min_results": 1
+      }
+    },
+    {
       "id": "nearby-plaza-history",
       "label": "Plaza-Core History Nearby",
       "mode": "nearby",
@@ -68,6 +88,24 @@
       }
     },
     {
+      "id": "nearby-plaza-water-empty",
+      "label": "Plaza Water Nearby Empty",
+      "mode": "nearby",
+      "purpose": "Protect honest empty behavior when a tight plaza-core query asks specifically for the water theme.",
+      "category": "mixed",
+      "theme": "water",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "center": { "lat": 35.6870, "lon": -105.9378 },
+      "radius_meters": 250,
+      "expectations": {
+        "expected_empty": true,
+        "forbidden_names": ["The Santa Fe Plaza", "Palace of the Governors"],
+        "max_results": 0
+      }
+    },
+    {
       "id": "nearby-downtown-scenic-empty",
       "label": "Downtown Scenic Nearby Empty",
       "mode": "nearby",
@@ -82,6 +120,32 @@
         "expected_empty": true,
         "forbidden_names": ["The Santa Fe Plaza", "Palace of the Governors"],
         "max_results": 0
+      }
+    },
+    {
+      "id": "route-acequia-water",
+      "label": "Acequia Water Route",
+      "mode": "route",
+      "purpose": "Prove that the water theme can pull route-plausible acequia and water-linked traces without turning into generic civic search.",
+      "category": "mixed",
+      "theme": "water",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "route_geometry": {
+        "type": "LineString",
+        "coordinates": [[-105.9345, 35.6804], [-105.9255, 35.6804]]
+      },
+      "origin": { "name": "Acequia West", "coordinates": [-105.9345, 35.6804] },
+      "destination": { "name": "Acequia East", "coordinates": [-105.9255, 35.6804] },
+      "max_detour_meters": 600,
+      "max_extra_minutes": 10,
+      "expectations": {
+        "expected_empty": false,
+        "expected_any_names": ["Acequia Madre", "Acequia Trail Crossing"],
+        "forbidden_names": ["The Santa Fe Plaza"],
+        "preferred_top_names": ["Acequia Madre"],
+        "min_results": 1
       }
     },
     {

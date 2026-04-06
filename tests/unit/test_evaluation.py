@@ -52,7 +52,7 @@ def test_load_combined_evaluation_cases() -> None:
     assert len(cases) >= 8
     assert any(case.mode == "route" for case in cases)
     assert any(case.mode == "nearby" for case in cases)
-    assert cases[0].id == "nearby-plaza-history"
+    assert any(case.id == "nearby-plaza-history" for case in cases)
 
 
 def test_evaluate_route_case_passes_on_expected_match() -> None:

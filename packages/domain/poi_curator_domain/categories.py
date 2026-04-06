@@ -106,6 +106,7 @@ OSM_TAG_RULES: list[OSMTagRule] = [
     OSMTagRule("pedestrian_plaza", "civic_space_plaza", {"highway": "pedestrian"}),
     OSMTagRule("viewpoint", "overlook_vista", {"tourism": "viewpoint"}),
     OSMTagRule("acequia_canal", "infrastructure_landmark", {"man_made": "canal"}),
+    OSMTagRule("waterway_trace", "infrastructure_landmark", {"waterway": "*"}),
     OSMTagRule("railway_trace", "infrastructure_landmark", {"railway": "*"}),
     OSMTagRule("man_made_infrastructure", "infrastructure_landmark", {"man_made": "*"}),
     OSMTagRule(
@@ -144,6 +145,17 @@ def classify_osm_tags(tags: dict[str, str]) -> ClassificationResult | None:
             matched_rule_id="park_named_plaza",
             matched_rule_tags={"leisure": "park", "name_contains": "plaza"},
         )
+    if _is_acequia_named_artwork(tags):
+        return ClassificationResult(
+            internal_type="infrastructure_landmark",
+            public_category="civic",
+            matched_rule_id="acequia_named_artwork_override",
+            matched_rule_tags={
+                "name_contains": "acequia",
+                "tourism": "artwork",
+                "artwork_type": tags.get("artwork_type", ""),
+            },
+        )
     matched_rule = match_osm_rule(tags)
     if matched_rule is None:
         return None
@@ -175,3 +187,13 @@ def _matches_required_tags(tags: dict[str, str], required_tags: dict[str, str]) 
         if expected_value != "*" and actual_value != expected_value:
             return False
     return True
+
+
+def _is_acequia_named_artwork(tags: dict[str, str]) -> bool:
+    name = tags.get("name", "").casefold()
+    if "acequia" not in name:
+        return False
+    if tags.get("tourism") != "artwork":
+        return False
+    artwork_type = tags.get("artwork_type")
+    return artwork_type in {"mural", "installation"}

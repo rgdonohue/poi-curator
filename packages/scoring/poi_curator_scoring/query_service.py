@@ -3,7 +3,12 @@ from datetime import UTC, datetime
 
 from geoalchemy2 import Geometry
 from geoalchemy2.shape import to_shape
-from poi_curator_domain.db import POI, OfficialMatchDiagnostic, POIEditorial, POIEvidence
+from poi_curator_domain.db import (
+    POI,
+    OfficialMatchDiagnostic,
+    POIEditorial,
+    POIEvidence,
+)
 from poi_curator_domain.descriptions import choose_short_description_for_poi
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
@@ -18,12 +23,16 @@ from poi_curator_domain.schemas import (
     NearbyResult,
     NearbySuggestRequest,
     NearbySuggestResponse,
+    POIThemeItem,
     POIDetailResponse,
     QuerySummary,
     RouteResult,
     RouteSuggestRequest,
     RouteSuggestResponse,
+    ThemeEvidenceReference,
 )
+from poi_curator_domain.theme_service import sync_theme_memberships
+from poi_curator_domain.themes import THEME_LABELS, is_query_theme_active
 from shapely.geometry import Point
 from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session, joinedload
@@ -53,6 +62,13 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         joinedload(POI.signals),
         joinedload(POI.editorial),
     )
+    if payload.theme is not None:
+        candidate_query = candidate_query.options(
+            joinedload(POI.aliases),
+            joinedload(POI.evidence_items),
+            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_editorials),
+        )
     if payload.region_hint is not None:
         candidate_query = candidate_query.where(POI.city == payload.region_hint)
 
@@ -62,11 +78,14 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         _route_prefilter_clause(route_line.wkt, payload.max_detour_meters),
     )
     pois = db.execute(candidate_query).unique().scalars().all()
+    if payload.theme is not None:
+        _ensure_theme_memberships(db, pois)
     log_event(
         logger,
         "route_candidates_prefiltered",
         region=payload.region_hint,
         category=payload.category,
+        theme=payload.theme,
         mode=payload.travel_mode,
         max_detour_meters=payload.max_detour_meters,
         candidate_count=len(pois),
@@ -76,6 +95,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
             query_summary=QuerySummary(
                 travel_mode=payload.travel_mode,
                 category=payload.category,
+                theme=payload.theme,
                 max_detour_meters=payload.max_detour_meters,
                 limit=payload.limit,
             ),
@@ -85,6 +105,8 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
     scored_results: list[tuple[float, RouteResult]] = []
     for poi in pois:
         if not category_matches(payload, poi):
+            continue
+        if not _poi_matches_theme(poi, payload.theme):
             continue
 
         centroid = to_shape(poi.centroid)
@@ -103,6 +125,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
                     score,
                     score_breakdown,
                     category_match,
+                    requested_theme=payload.theme,
                 ),
             )
         )
@@ -112,6 +135,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         query_summary=QuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
+            theme=payload.theme,
             max_detour_meters=payload.max_detour_meters,
             limit=payload.limit,
         ),
@@ -122,6 +146,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         "route_suggest_completed",
         region=payload.region_hint,
         category=payload.category,
+        theme=payload.theme,
         mode=payload.travel_mode,
         candidate_count=len(pois),
         result_count=len(response.results),
@@ -134,6 +159,13 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         joinedload(POI.signals),
         joinedload(POI.editorial),
     )
+    if payload.theme is not None:
+        candidate_query = candidate_query.options(
+            joinedload(POI.aliases),
+            joinedload(POI.evidence_items),
+            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_editorials),
+        )
     if payload.region_hint is not None:
         candidate_query = candidate_query.where(POI.city == payload.region_hint)
 
@@ -142,11 +174,14 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         _nearby_prefilter_clause(payload.center.lon, payload.center.lat, payload.radius_meters),
     )
     pois = db.execute(candidate_query).unique().scalars().all()
+    if payload.theme is not None:
+        _ensure_theme_memberships(db, pois)
     log_event(
         logger,
         "nearby_candidates_prefiltered",
         region=payload.region_hint,
         category=payload.category,
+        theme=payload.theme,
         mode=payload.travel_mode,
         radius_meters=payload.radius_meters,
         candidate_count=len(pois),
@@ -156,6 +191,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
             query_summary=NearbyQuerySummary(
                 travel_mode=payload.travel_mode,
                 category=payload.category,
+                theme=payload.theme,
                 radius_meters=payload.radius_meters,
                 limit=payload.limit,
             ),
@@ -166,6 +202,8 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
     scored_results: list[tuple[float, NearbyResult]] = []
     for poi in pois:
         if not category_matches(payload, poi):
+            continue
+        if not _poi_matches_theme(poi, payload.theme):
             continue
 
         centroid = to_shape(poi.centroid)
@@ -185,6 +223,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
                     score_breakdown,
                     category_match,
                     payload.travel_mode,
+                    requested_theme=payload.theme,
                 ),
             )
         )
@@ -194,6 +233,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         query_summary=NearbyQuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
+            theme=payload.theme,
             radius_meters=payload.radius_meters,
             limit=payload.limit,
         ),
@@ -204,6 +244,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         "nearby_suggest_completed",
         region=payload.region_hint,
         category=payload.category,
+        theme=payload.theme,
         mode=payload.travel_mode,
         radius_meters=payload.radius_meters,
         candidate_count=len(pois),
@@ -222,10 +263,13 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
             joinedload(POI.editorial),
             joinedload(POI.evidence_items),
             joinedload(POI.aliases),
+            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_editorials),
         )
     )
     if poi is None:
         return None
+    _ensure_theme_memberships(db, [poi])
 
     centroid = to_shape(poi.centroid)
     return POIDetailResponse(
@@ -260,6 +304,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
                 key=lambda item: (item.source_id, item.evidence_type, item.evidence_label or ""),
             )
         ],
+        themes=_build_theme_items(poi),
     )
 
 
@@ -297,10 +342,13 @@ def get_admin_poi_evidence(
         .options(
             joinedload(POI.aliases),
             joinedload(POI.evidence_items).joinedload(POIEvidence.source),
+            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_editorials),
         )
     )
     if poi is None:
         return None
+    _ensure_theme_memberships(db, [poi])
 
     evidence_items = sorted(
         poi.evidence_items,
@@ -344,6 +392,7 @@ def get_admin_poi_evidence(
             )
             for item in evidence_items
         ],
+        themes=_build_theme_items(poi),
     )
 
 
@@ -508,3 +557,63 @@ def _route_prefilter_clause(route_wkt: str, max_detour_meters: int) -> ColumnEle
         _metric_space(route_geom),
         max_detour_meters,
     )
+
+
+def _ensure_theme_memberships(db: Session, pois: list[POI]) -> None:
+    if not pois:
+        return
+    if sync_theme_memberships(db, pois):
+        db.commit()
+
+
+def _poi_matches_theme(poi: POI, theme: str | None) -> bool:
+    if theme is None:
+        return True
+    if not is_query_theme_active(theme):
+        return False
+    return any(
+        membership.theme_slug == theme and membership.status == "accepted"
+        for membership in getattr(poi, "theme_memberships", []) or []
+    )
+
+
+def _build_theme_items(poi: POI) -> list[POIThemeItem]:
+    evidence_by_id = {item.id: item for item in getattr(poi, "evidence_items", []) or []}
+    editorial_by_slug = {
+        str(editorial.theme_slug): editorial for editorial in getattr(poi, "theme_editorials", []) or []
+    }
+    items: list[POIThemeItem] = []
+    for membership in sorted(
+        getattr(poi, "theme_memberships", []) or [],
+        key=lambda item: (item.theme_slug != "water", item.theme_slug),
+    ):
+        editorial = editorial_by_slug.get(str(membership.theme_slug))
+        items.append(
+            POIThemeItem(
+                theme_slug=membership.theme_slug,
+                label=THEME_LABELS.get(membership.theme_slug, membership.theme_slug),
+                status=membership.status,
+                assignment_basis=membership.assignment_basis,
+                confidence=membership.confidence,
+                rationale_summary=membership.rationale_summary,
+                is_query_active=is_query_theme_active(membership.theme_slug),
+                editorial_decision=(
+                    editorial.editorial_decision if editorial is not None else None
+                ),
+                evidence=[
+                    ThemeEvidenceReference(
+                        evidence_id=link.poi_evidence_id,
+                        source_id=evidence_by_id[link.poi_evidence_id].source_id,
+                        evidence_type=evidence_by_id[link.poi_evidence_id].evidence_type,
+                        label=evidence_by_id[link.poi_evidence_id].evidence_label,
+                        confidence=evidence_by_id[link.poi_evidence_id].confidence,
+                    )
+                    for link in sorted(
+                        membership.evidence_links,
+                        key=lambda item: item.poi_evidence_id,
+                    )
+                    if link.poi_evidence_id in evidence_by_id
+                ],
+            )
+        )
+    return items

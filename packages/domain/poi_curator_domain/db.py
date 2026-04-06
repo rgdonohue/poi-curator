@@ -132,6 +132,8 @@ class POI(Base):
     raw_sources: Mapped[list[POISourceRaw]] = relationship(back_populates="canonical_poi")
     aliases: Mapped[list["POIAlias"]] = relationship(back_populates="poi")
     evidence_items: Mapped[list["POIEvidence"]] = relationship(back_populates="poi")
+    theme_memberships: Mapped[list["POIThemeMembership"]] = relationship(back_populates="poi")
+    theme_editorials: Mapped[list["POIThemeEditorial"]] = relationship(back_populates="poi")
     match_diagnostics: Mapped[list["OfficialMatchDiagnostic"]] = relationship(
         back_populates="poi",
         foreign_keys="OfficialMatchDiagnostic.matched_poi_id",
@@ -210,6 +212,22 @@ class SourceRegistry(Base):
     )
 
 
+class ThemeDefinition(Base):
+    __tablename__ = "theme_definition"
+
+    theme_slug: Mapped[str] = mapped_column(String(64), primary_key=True)
+    label: Mapped[str] = mapped_column(String(128), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    region_scope: Mapped[str | None] = mapped_column(String(128))
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    is_query_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    memberships: Mapped[list["POIThemeMembership"]] = relationship(back_populates="theme")
+    editorial_overrides: Mapped[list["POIThemeEditorial"]] = relationship(back_populates="theme")
+
+
 class POIAlias(Base):
     __tablename__ = "poi_alias"
 
@@ -245,6 +263,65 @@ class POIEvidence(Base):
 
     poi: Mapped[POI] = relationship(back_populates="evidence_items")
     source: Mapped[SourceRegistry] = relationship(back_populates="evidence_items")
+    theme_membership_links: Mapped[list["POIThemeMembershipEvidence"]] = relationship(
+        back_populates="evidence"
+    )
+
+
+class POIThemeMembership(Base):
+    __tablename__ = "poi_theme_membership"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    poi_id: Mapped[str] = mapped_column(ForeignKey("poi.poi_id"), nullable=False)
+    theme_slug: Mapped[str] = mapped_column(
+        ForeignKey("theme_definition.theme_slug"),
+        nullable=False,
+    )
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    assignment_basis: Mapped[str] = mapped_column(String(32), nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    rationale_summary: Mapped[str | None] = mapped_column(Text)
+    computed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+
+    poi: Mapped[POI] = relationship(back_populates="theme_memberships")
+    theme: Mapped[ThemeDefinition] = relationship(back_populates="memberships")
+    evidence_links: Mapped[list["POIThemeMembershipEvidence"]] = relationship(
+        back_populates="membership",
+        cascade="all, delete-orphan",
+    )
+
+
+class POIThemeMembershipEvidence(Base):
+    __tablename__ = "poi_theme_membership_evidence"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    membership_id: Mapped[int] = mapped_column(
+        ForeignKey("poi_theme_membership.id"),
+        nullable=False,
+    )
+    poi_evidence_id: Mapped[int] = mapped_column(ForeignKey("poi_evidence.id"), nullable=False)
+    contribution_type: Mapped[str] = mapped_column(String(32), nullable=False)
+    weight: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+
+    membership: Mapped[POIThemeMembership] = relationship(back_populates="evidence_links")
+    evidence: Mapped[POIEvidence] = relationship(back_populates="theme_membership_links")
+
+
+class POIThemeEditorial(Base):
+    __tablename__ = "poi_theme_editorial"
+
+    poi_id: Mapped[str] = mapped_column(ForeignKey("poi.poi_id"), primary_key=True)
+    theme_slug: Mapped[str] = mapped_column(
+        ForeignKey("theme_definition.theme_slug"),
+        primary_key=True,
+    )
+    editorial_decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    notes: Mapped[str | None] = mapped_column(Text)
+    reviewed_by: Mapped[str | None] = mapped_column(String(255))
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+    poi: Mapped[POI] = relationship(back_populates="theme_editorials")
+    theme: Mapped[ThemeDefinition] = relationship(back_populates="editorial_overrides")
 
 
 class OfficialMatchDiagnostic(Base):

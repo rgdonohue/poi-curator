@@ -19,6 +19,7 @@ class POIFixture:
     badges: list[str]
     why_it_matters: list[str]
     provenance: dict[str, str]
+    themes: list[str]
 
 
 FIXTURE_POIS: list[POIFixture] = [
@@ -45,6 +46,7 @@ FIXTURE_POIS: list[POIFixture] = [
             "very low detour burden",
         ],
         provenance={"osm_id": "way/acequia-madre", "wikidata_id": "Q999001"},
+        themes=["water"],
     ),
     POIFixture(
         poi_id="poi-santa-fe-plaza",
@@ -70,6 +72,7 @@ FIXTURE_POIS: list[POIFixture] = [
             "reviewed landmark candidate",
         ],
         provenance={"osm_id": "way/santa-fe-plaza", "wikidata_id": "Q999002"},
+        themes=[],
     ),
     POIFixture(
         poi_id="poi-canyon-road-corridor",
@@ -94,6 +97,7 @@ FIXTURE_POIS: list[POIFixture] = [
             "distinctive corridor character",
         ],
         provenance={"osm_id": "way/canyon-road", "wikipedia_title": "Canyon_Road"},
+        themes=[],
     ),
     POIFixture(
         poi_id="poi-rail-yard",
@@ -119,6 +123,7 @@ FIXTURE_POIS: list[POIFixture] = [
             "solid route fit",
         ],
         provenance={"osm_id": "way/rail-yard", "wikidata_id": "Q999004"},
+        themes=[],
     ),
     POIFixture(
         poi_id="poi-cross-of-the-martyrs",
@@ -143,5 +148,6 @@ FIXTURE_POIS: list[POIFixture] = [
             "connects terrain with historical framing",
         ],
         provenance={"osm_id": "node/cross-martyrs", "wikipedia_title": "Cross_of_the_Martyrs"},
+        themes=[],
     ),
 ]

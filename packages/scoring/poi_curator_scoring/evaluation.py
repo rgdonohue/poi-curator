@@ -33,6 +33,7 @@ class BaseEvaluationCase(BaseModel):
     label: str
     purpose: str
     category: str
+    theme: str | None = None
     travel_mode: TravelMode
     region_hint: str | None = None
     limit: int = Field(default=5, ge=1, le=20)
@@ -54,6 +55,7 @@ class RouteEvaluationCase(BaseEvaluationCase):
             destination=self.destination,
             travel_mode=self.travel_mode,
             category=cast(PublicCategory, self.category),
+            theme=self.theme,
             max_detour_meters=self.max_detour_meters,
             max_extra_minutes=self.max_extra_minutes,
             region_hint=self.region_hint,
@@ -71,6 +73,7 @@ class NearbyEvaluationCase(BaseEvaluationCase):
             center=self.center,
             travel_mode=self.travel_mode,
             category=cast(PublicCategory, self.category),
+            theme=self.theme,
             radius_meters=self.radius_meters,
             region_hint=self.region_hint,
             limit=self.limit,

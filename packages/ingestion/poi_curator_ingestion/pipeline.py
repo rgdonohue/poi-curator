@@ -17,6 +17,7 @@ from poi_curator_domain.db import (
 from poi_curator_domain.descriptions import description_quality_score
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.regions import RegionSpec
+from poi_curator_domain.theme_service import sync_theme_memberships
 from sqlalchemy import delete, false, select
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, joinedload
@@ -367,6 +368,7 @@ def upsert_canonical_poi(
     raw_record.canonical_poi = poi
     upsert_signals(session, poi, raw_record.raw_payload_json.get("tags", {}))
     ensure_editorial_stub(session, poi)
+    sync_theme_memberships(session, [poi])
     session.flush()
     return created
 

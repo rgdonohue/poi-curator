@@ -110,6 +110,7 @@ def build_nearby_result(
     score_breakdown: dict[str, float],
     category_match: Literal["primary", "secondary", "mixed"],
     payload_mode: str,
+    requested_theme: str | None = None,
 ) -> NearbyResult:
     secondary_categories = [
         category for category in poi.display_categories if category != poi.normalized_category
@@ -138,11 +139,15 @@ def build_nearby_result(
             score_breakdown=score_breakdown,
             category_match=category_match,
             spatial_mode="nearby",
+            requested_theme=requested_theme,
+            theme_match=requested_theme == "water",
         ),
         badges=build_badges(
             poi,
             spatial_mode="nearby",
             distance_m=metrics.distance_from_point_m,
             travel_mode=payload_mode,
+            requested_theme=requested_theme,
+            theme_match=requested_theme == "water",
         ),
     )

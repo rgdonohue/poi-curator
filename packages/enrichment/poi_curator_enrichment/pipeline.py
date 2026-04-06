@@ -15,6 +15,7 @@ from poi_curator_domain.db import (
 from poi_curator_domain.descriptions import description_quality_score
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.settings import get_settings
+from poi_curator_domain.theme_service import sync_theme_memberships
 from poi_curator_domain.text import slugify
 from poi_curator_ingestion.normalize import build_short_description
 from sqlalchemy import delete, select
@@ -840,6 +841,7 @@ def recompute_evidence_signals(session: Session, pois: list[POI]) -> None:
             0.4 + signals.official_corroboration_score * 0.4,
         )
         signals.computed_at = datetime.now(UTC)
+    sync_theme_memberships(session, pois)
 
 
 def summarize_evidence_signals(evidence_rows: list[POIEvidence]) -> EvidenceSignalSummary:
