@@ -19,6 +19,15 @@ def test_categories_endpoint() -> None:
     assert response.status_code == 200
     payload = response.json()
     assert any(item["slug"] == "history" for item in payload)
+    assert any(item["slug"] == "mixed" for item in payload)
+
+
+def test_map_test_page_is_served() -> None:
+    response = client.get("/map-test")
+
+    assert response.status_code == 200
+    assert "text/html" in response.headers["content-type"]
+    assert "POI Curator Map Test" in response.text
 
 
 def test_route_suggest_endpoint() -> None:

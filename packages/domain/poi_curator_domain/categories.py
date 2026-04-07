@@ -44,6 +44,11 @@ PUBLIC_CATEGORIES: list[CategoryResponse] = [
             "Plazas, rail yards, irrigation works, and other civic or infrastructural traces."
         ),
     ),
+    CategoryResponse(
+        slug="mixed",
+        label="Mixed",
+        description="Blend categories to see the strongest meaningful places regardless of type.",
+    ),
 ]
 
 

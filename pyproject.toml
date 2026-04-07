@@ -54,6 +54,9 @@ where = [
 ]
 include = ["poi_curator*"]
 
+[tool.setuptools.package-data]
+poi_curator_api = ["static/**/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"

@@ -45,6 +45,14 @@ make migrate
 make api
 ```
 
+6. Open the map tester:
+
+```text
+http://localhost:8000/map-test
+```
+
+The tester is served by the same FastAPI app and talks to the local backend on the same origin, so no extra frontend config is required. It uses MapLibre GL JS plus OpenStreetMap raster tiles from public CDNs.
+
 ## Useful Commands
 
 ```bash
@@ -76,6 +84,15 @@ tests/golden_routes
 infra/docker
 docs/planning
 ```
+
+## Map Test UI
+
+The repository now includes a minimal local testing interface at `/map-test` for:
+
+- nearby suggestion testing from a clicked map center
+- manual or sample route suggestion testing
+- category and active theme filters (`water`, `rail`)
+- score, explanation, badge, and POI detail inspection on a map
 
 ## Next Build Steps
 

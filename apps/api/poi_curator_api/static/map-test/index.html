@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>poi-curator — map-test</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/static/map-test/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+
+        <!-- ── App header ─────────────────────────────────── -->
+        <header class="app-header">
+          <div class="app-header-identity">
+            <span class="app-name">poi-curator</span>
+            <span class="app-sep">›</span>
+            <span class="app-sub">map-test</span>
+          </div>
+          <span id="status-pill" class="status-pill">Ready</span>
+        </header>
+
+        <!-- ── Query Controls ─────────────────────────────── -->
+        <section class="panel controls-panel">
+          <div class="section-heading">
+            <h2>Query Controls</h2>
+          </div>
+
+          <div class="mode-toggle" role="radiogroup" aria-label="Query mode">
+            <label class="toggle-chip">
+              <input type="radio" name="mode" value="nearby" checked />
+              <span>Nearby</span>
+            </label>
+            <label class="toggle-chip">
+              <input type="radio" name="mode" value="route" />
+              <span>Route</span>
+            </label>
+          </div>
+
+          <div class="field-grid">
+            <label class="field">
+              <span>Category</span>
+              <div class="select-wrapper">
+                <select id="category-select"></select>
+              </div>
+            </label>
+            <label class="field">
+              <span>Theme</span>
+              <div class="select-wrapper">
+                <select id="theme-select">
+                  <option value="">None</option>
+                  <option value="water">Water</option>
+                  <option value="rail">Rail</option>
+                </select>
+              </div>
+            </label>
+            <label class="field">
+              <span>Travel Mode</span>
+              <div class="select-wrapper">
+                <select id="travel-mode-select">
+                  <option value="walking">Walking</option>
+                  <option value="driving">Driving</option>
+                </select>
+              </div>
+            </label>
+            <label class="field">
+              <span>Limit</span>
+              <input id="limit-input" type="number" min="1" max="20" value="8" />
+            </label>
+          </div>
+
+          <!-- Nearby mode -->
+          <div id="nearby-controls" class="mode-panel">
+            <div class="section-heading small">
+              <h3>Nearby Mode</h3>
+              <span id="nearby-center-readout" class="inline-note">No center selected</span>
+            </div>
+
+            <div class="preset-row" id="nearby-preset-row"></div>
+
+            <div class="field-grid nearby-grid">
+              <label class="field">
+                <span>Radius (m)</span>
+                <input id="radius-input" type="number" min="50" step="50" value="900" />
+              </label>
+            </div>
+
+            <p class="hint">Click the map to set the nearby center, or use a preset.</p>
+          </div>
+
+          <!-- Route mode -->
+          <div id="route-controls" class="mode-panel hidden">
+            <div class="section-heading small">
+              <h3>Route Mode</h3>
+              <span id="route-summary" class="inline-note">Add at least 2 route points</span>
+            </div>
+
+            <div class="field-grid route-grid">
+              <label class="field route-sample-field">
+                <span>Sample Route</span>
+                <div class="select-wrapper">
+                  <select id="sample-route-select"></select>
+                </div>
+              </label>
+              <div class="field inline-action-field">
+                <span>Route Helpers</span>
+                <div class="action-stack">
+                  <button id="load-route-button" type="button" class="secondary-button">
+                    Load Sample
+                  </button>
+                  <button id="undo-route-point-button" type="button" class="secondary-button">
+                    Undo Point
+                  </button>
+                </div>
+              </div>
+              <label class="field">
+                <span>Max Detour (m)</span>
+                <input id="max-detour-input" type="number" min="50" step="50" value="800" />
+              </label>
+              <div class="field">
+                <span>Extra Minutes</span>
+                <div id="extra-minutes-readout" class="readonly-value">Auto</div>
+              </div>
+            </div>
+
+            <p class="hint">
+              Click the map to add route vertices. Origin and destination come from the first and
+              last points.
+            </p>
+          </div>
+
+          <div class="action-row">
+            <button id="run-query-button" type="button" class="primary-button">Run Query</button>
+            <button id="copy-payload-button" type="button" class="secondary-button">
+              Copy Payload
+            </button>
+            <button id="reset-button" type="button" class="secondary-button">Reset</button>
+          </div>
+        </section>
+
+        <!-- ── Selection Detail ───────────────────────────── -->
+        <section class="panel detail-panel">
+          <div class="section-heading">
+            <h2>Selection Detail</h2>
+            <label class="checkbox">
+              <input id="show-raw-toggle" type="checkbox" />
+              <span>Raw scores</span>
+            </label>
+          </div>
+
+          <div id="detail-empty" class="empty-state">
+            <div class="skeleton-preview">
+              <div class="skeleton-preview-header">
+                <div class="skeleton-bone" style="width: 52%; height: 13px;"></div>
+                <div class="skeleton-bone" style="width: 15%; height: 13px;"></div>
+              </div>
+              <div class="skeleton-bone" style="width: 38%; height: 9px;"></div>
+              <div class="skeleton-bone" style="width: 90%; height: 9px; margin-top: 10px;"></div>
+              <div class="skeleton-bone" style="width: 76%; height: 9px;"></div>
+              <div class="skeleton-bone" style="width: 55%; height: 9px;"></div>
+            </div>
+            <p class="empty-label">Click a result to inspect it.</p>
+          </div>
+          <div id="detail-content" class="detail-content hidden"></div>
+        </section>
+
+        <!-- ── Results ────────────────────────────────────── -->
+        <section class="panel results-panel">
+          <div class="section-heading">
+            <h2>Results</h2>
+            <span id="result-count" class="count-pill">0</span>
+          </div>
+          <div id="query-summary" class="query-summary">No query submitted yet.</div>
+          <div id="results-list" class="results-list"></div>
+        </section>
+
+      </aside>
+
+      <!-- ── Map ──────────────────────────────────────────── -->
+      <main class="map-panel">
+        <div class="map-header">
+          <h2>Santa Fe</h2>
+          <p id="map-instruction" class="map-instruction">
+            Nearby mode: click the map to set the query center.
+          </p>
+        </div>
+        <div id="map" class="map"></div>
+      </main>
+    </div>
+
+    <script defer src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script defer src="/static/map-test/app.js"></script>
+  </body>
+</html>
