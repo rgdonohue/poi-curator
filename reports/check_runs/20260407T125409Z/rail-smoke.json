@@ -1,0 +1,713 @@
+{
+  "generated_at": "2026-04-07T12:54:10.271412Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 4,
+  "passed_count": 4,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "nearby-railyard-civic",
+      "label": "Railyard Civic Nearby",
+      "mode": "nearby",
+      "purpose": "Protect infrastructural and civic readings around the railyard.",
+      "category": "civic",
+      "theme": null,
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 3,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "civic",
+        "theme": null,
+        "radius_meters": 900,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.6815,
+          "lon": -105.952
+        },
+        "travel_mode": "walking",
+        "category": "civic",
+        "theme": null,
+        "radius_meters": 900,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Rail Trail St. Francis Tunnel Grid Vent",
+        "Denver & Rio Grande Western Railroad Depot"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Atchison, Topeka & Santa Fe Railway Depot",
+          "score": 47.5,
+          "primary_category": "history",
+          "category_match_type": "secondary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_center_m=707 access_min=9",
+          "score_breakdown": {
+            "point_proximity": 3.86,
+            "radius_fit": 2.57,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 10.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 2.5,
+            "category_intent_guardrail": -2.0
+          }
+        },
+        {
+          "name": "Rail Trail St. Francis Tunnel Grid Vent",
+          "score": 47.4,
+          "primary_category": "civic",
+          "category_match_type": "primary",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_center_m=472 access_min=6",
+          "score_breakdown": {
+            "point_proximity": 8.56,
+            "radius_fit": 5.71,
+            "significance": 19.2,
+            "quality": 6.0,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": -5.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Denver & Rio Grande Western Railroad Depot",
+          "score": 47.2,
+          "primary_category": "history",
+          "category_match_type": "secondary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_center_m=715 access_min=9",
+          "score_breakdown": {
+            "point_proximity": 3.7,
+            "radius_fit": 2.47,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 10.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 2.5,
+            "category_intent_guardrail": -2.0
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "nearby-railyard-rail",
+      "label": "Railyard Rail Nearby",
+      "mode": "nearby",
+      "purpose": "Prove that the rail theme can narrow nearby suggestions to legible rail depots, districts, and repurposed corridor traces around the railyard.",
+      "category": "mixed",
+      "theme": "rail",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 4,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "radius_meters": 900,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.6815,
+          "lon": -105.952
+        },
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "radius_meters": 900,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot",
+        "Santa Fe Railyard Park",
+        "Rail Trail St. Francis Tunnel Grid Vent"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Atchison, Topeka & Santa Fe Railway Depot",
+          "score": 49.0,
+          "primary_category": "history",
+          "category_match_type": "mixed",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_center_m=707 access_min=9",
+          "score_breakdown": {
+            "point_proximity": 3.86,
+            "radius_fit": 2.57,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 4.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 8.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Denver & Rio Grande Western Railroad Depot",
+          "score": 48.7,
+          "primary_category": "history",
+          "category_match_type": "mixed",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_center_m=715 access_min=9",
+          "score_breakdown": {
+            "point_proximity": 3.7,
+            "radius_fit": 2.47,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 4.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 8.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Santa Fe Railyard Park",
+          "score": 48.5,
+          "primary_category": "scenic",
+          "category_match_type": "mixed",
+          "short_description": "Landscape access point with ecological or scenic value.",
+          "distance_label": "distance_from_center_m=252 access_min=3",
+          "score_breakdown": {
+            "point_proximity": 12.96,
+            "radius_fit": 8.64,
+            "significance": 15.6,
+            "quality": 6.75,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Rail Trail St. Francis Tunnel Grid Vent",
+          "score": 39.4,
+          "primary_category": "civic",
+          "category_match_type": "mixed",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_center_m=472 access_min=6",
+          "score_breakdown": {
+            "point_proximity": 8.56,
+            "radius_fit": 5.71,
+            "significance": 19.2,
+            "quality": 6.0,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": -3.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "route-railyard-civic",
+      "label": "Rail Yard Corridor",
+      "mode": "route",
+      "purpose": "Protect civic and infrastructural route behavior through the railyard corridor.",
+      "category": "civic",
+      "theme": null,
+      "travel_mode": "driving",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 5,
+      "query_summary": {
+        "travel_mode": "driving",
+        "category": "civic",
+        "theme": null,
+        "max_detour_meters": 1500,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.955,
+              35.679
+            ],
+            [
+              -105.948,
+              35.6835
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Depot South",
+          "coordinates": [
+            -105.955,
+            35.679
+          ]
+        },
+        "destination": {
+          "name": "Depot North",
+          "coordinates": [
+            -105.948,
+            35.6835
+          ]
+        },
+        "travel_mode": "driving",
+        "category": "civic",
+        "theme": null,
+        "max_detour_meters": 1500,
+        "max_extra_minutes": 7,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot",
+        "Rail Trail St. Francis Tunnel Grid Vent",
+        "De Fouri Street Bridge",
+        "Guadalupe Street Bridge"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Atchison, Topeka & Santa Fe Railway Depot",
+          "score": 73.9,
+          "primary_category": "history",
+          "category_match_type": "secondary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=185 detour_m=370 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 12.69,
+            "detour_fit": 11.3,
+            "budget_fit": 4.03,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 10.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 2.5,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Denver & Rio Grande Western Railroad Depot",
+          "score": 72.1,
+          "primary_category": "history",
+          "category_match_type": "secondary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=196 detour_m=392 extra_min=2",
+          "score_breakdown": {
+            "route_proximity": 12.55,
+            "detour_fit": 11.08,
+            "budget_fit": 3.63,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 10.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 2.5,
+            "category_intent_guardrail": -1.0
+          }
+        },
+        {
+          "name": "Rail Trail St. Francis Tunnel Grid Vent",
+          "score": 66.3,
+          "primary_category": "civic",
+          "category_match_type": "primary",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_route_m=119 detour_m=238 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 13.51,
+            "detour_fit": 12.62,
+            "budget_fit": 4.25,
+            "significance": 19.2,
+            "quality": 6.0,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": -5.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "De Fouri Street Bridge",
+          "score": 46.3,
+          "primary_category": "civic",
+          "category_match_type": "primary",
+          "short_description": "Replaced the original, narrower bridge",
+          "distance_label": "distance_from_route_m=643 detour_m=1286 extra_min=5",
+          "score_breakdown": {
+            "route_proximity": 6.96,
+            "detour_fit": 2.14,
+            "budget_fit": 1.07,
+            "significance": 19.2,
+            "quality": 6.25,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": -5.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Guadalupe Street Bridge",
+          "score": 46.1,
+          "primary_category": "civic",
+          "category_match_type": "primary",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_route_m=655 detour_m=1310 extra_min=5",
+          "score_breakdown": {
+            "route_proximity": 6.81,
+            "detour_fit": 1.9,
+            "budget_fit": 1.03,
+            "significance": 19.2,
+            "quality": 6.5,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": -5.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    },
+    {
+      "case_id": "route-railyard-rail",
+      "label": "Rail Corridor Theme Route",
+      "mode": "route",
+      "purpose": "Prove that the rail theme can pull route-plausible depots and rail-corridor traces without turning into generic civic or history search.",
+      "category": "mixed",
+      "theme": "rail",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 4,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "max_detour_meters": 900,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.955,
+              35.679
+            ],
+            [
+              -105.948,
+              35.6835
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Depot South",
+          "coordinates": [
+            -105.955,
+            35.679
+          ]
+        },
+        "destination": {
+          "name": "Depot North",
+          "coordinates": [
+            -105.948,
+            35.6835
+          ]
+        },
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "max_detour_meters": 900,
+        "max_extra_minutes": 10,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Atchison, Topeka & Santa Fe Railway Depot",
+        "Denver & Rio Grande Western Railroad Depot",
+        "Rail Trail St. Francis Tunnel Grid Vent",
+        "Santa Fe Railyard Park"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Atchison, Topeka & Santa Fe Railway Depot",
+          "score": 57.2,
+          "primary_category": "history",
+          "category_match_type": "mixed",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=185 detour_m=370 extra_min=5",
+          "score_breakdown": {
+            "route_proximity": 11.15,
+            "detour_fit": 8.83,
+            "budget_fit": 2.72,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 4.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Denver & Rio Grande Western Railroad Depot",
+          "score": 56.6,
+          "primary_category": "history",
+          "category_match_type": "mixed",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=196 detour_m=392 extra_min=5",
+          "score_breakdown": {
+            "route_proximity": 10.92,
+            "detour_fit": 8.47,
+            "budget_fit": 2.66,
+            "significance": 20.4,
+            "quality": 5.75,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 4.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Rail Trail St. Francis Tunnel Grid Vent",
+          "score": 52.2,
+          "primary_category": "civic",
+          "category_match_type": "mixed",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_route_m=119 detour_m=238 extra_min=3",
+          "score_breakdown": {
+            "route_proximity": 12.52,
+            "detour_fit": 11.03,
+            "budget_fit": 3.59,
+            "significance": 19.2,
+            "quality": 6.0,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": -3.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Santa Fe Railyard Park",
+          "score": 49.3,
+          "primary_category": "scenic",
+          "category_match_type": "mixed",
+          "short_description": "Landscape access point with ecological or scenic value.",
+          "distance_label": "distance_from_route_m=189 detour_m=378 extra_min=5",
+          "score_breakdown": {
+            "route_proximity": 11.06,
+            "detour_fit": 8.7,
+            "budget_fit": 2.7,
+            "significance": 15.6,
+            "quality": 6.75,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

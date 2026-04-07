@@ -106,6 +106,7 @@ function cacheElements() {
   els.detailContent = document.getElementById("detail-content");
   els.showRawToggle = document.getElementById("show-raw-toggle");
   els.statusPill = document.getElementById("status-pill");
+  els.statusDot  = document.getElementById("status-dot");
   els.nearbyControls = document.getElementById("nearby-controls");
   els.routeControls = document.getElementById("route-controls");
   els.nearbyCenterReadout = document.getElementById("nearby-center-readout");
@@ -664,12 +665,24 @@ async function copyPayload() {
   }
 
   const serialized = JSON.stringify(payload, null, 2);
-  try {
-    await navigator.clipboard.writeText(serialized);
-    setStatus("Copied payload to clipboard.");
-  } catch (error) {
-    setStatus(`Clipboard copy failed: ${error.message}`);
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(serialized);
+      setStatus("Copied payload to clipboard.");
+      return;
+    } catch {
+      // Fall through to execCommand fallback (non-secure context or focus loss).
+    }
   }
+  const textarea = document.createElement("textarea");
+  textarea.value = serialized;
+  textarea.style.cssText = "position:fixed;top:-9999px;left:-9999px;opacity:0";
+  document.body.appendChild(textarea);
+  textarea.focus();
+  textarea.select();
+  const ok = document.execCommand("copy");
+  document.body.removeChild(textarea);
+  setStatus(ok ? "Copied payload to clipboard." : "Clipboard copy failed — try HTTPS or focus the page.");
 }
 
 function renderQuerySummary(summary) {
@@ -1008,6 +1021,14 @@ function setSelectedMode(mode) {
 
 function setStatus(message) {
   els.statusPill.textContent = message;
+  const lower = message.toLowerCase();
+  const isError   = lower.includes("fail") || lower.includes("error") || lower.includes("need");
+  const isActive  = lower.includes("query") || lower.includes("load");
+  const isOk      = lower.includes("loaded") || lower.includes("copied") || lower.includes("ready") || lower.includes("reset");
+  els.statusDot.className = "status-dot" +
+    (isError  ? " is-error"  :
+     isOk     ? " is-ok"     :
+     isActive ? " is-active" : "");
 }
 
 function formatDistanceText(result) {

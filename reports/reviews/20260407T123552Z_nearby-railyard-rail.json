@@ -1,0 +1,25 @@
+{
+  "case_id": "nearby-railyard-rail",
+  "label": "Railyard Rail Nearby",
+  "mode": "nearby",
+  "category": "mixed",
+  "theme": "rail",
+  "timestamp": "2026-04-07T12:35:52.422049Z",
+  "reviewer": "richard",
+  "verdict": "good",
+  "note": "Depot anchors now read first.",
+  "query_summary": {
+    "travel_mode": "walking",
+    "category": "mixed",
+    "theme": "rail",
+    "radius_meters": 900,
+    "limit": 5
+  },
+  "top_returned_names": [
+    "Atchison, Topeka & Santa Fe Railway Depot",
+    "Denver & Rio Grande Western Railroad Depot",
+    "Santa Fe Railyard Park",
+    "Rail Trail St. Francis Tunnel Grid Vent"
+  ],
+  "fixtures_path": "data/fixtures/eval_santa_fe.json"
+}

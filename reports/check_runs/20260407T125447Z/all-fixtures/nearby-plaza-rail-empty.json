@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-04-07T12:54:47.563543Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "nearby-plaza-rail-empty",
+      "label": "Plaza Rail Nearby Empty",
+      "mode": "nearby",
+      "purpose": "Protect honest empty behavior when a plaza-core query asks specifically for the rail theme.",
+      "category": "mixed",
+      "theme": "rail",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 0,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "radius_meters": 350,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.687,
+          "lon": -105.9378
+        },
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "rail",
+        "radius_meters": 350,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [],
+      "violated_forbidden_names": [],
+      "top_result_names": [],
+      "soft_warnings": [],
+      "notes": [],
+      "results": []
+    }
+  ]
+}
