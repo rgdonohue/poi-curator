@@ -8,6 +8,7 @@ from poi_curator_domain.db import (
     OfficialMatchDiagnostic,
     POIEditorial,
     POIEvidence,
+    POIThemeEditorial,
     POIThemeMembership,
 )
 from poi_curator_domain.descriptions import choose_short_description_for_poi
@@ -20,6 +21,13 @@ from poi_curator_domain.schemas import (
     AdminPOIItem,
     AdminPOIPatchRequest,
     AdminPOIPatchResponse,
+    AdminThemeAutomatedMembership,
+    AdminThemeEditorialRecord,
+    AdminThemeEffectiveOutcome,
+    AdminThemeMembershipDetailResponse,
+    AdminThemeMembershipQueueItem,
+    AdminThemeReviewResponse,
+    AdminThemeSummaryItem,
     NearbyQuerySummary,
     NearbyResult,
     NearbySuggestRequest,
@@ -32,7 +40,15 @@ from poi_curator_domain.schemas import (
     RouteSuggestResponse,
     ThemeEvidenceReference,
 )
-from poi_curator_domain.theme_service import sync_theme_memberships
+from poi_curator_domain.theme_service import (
+    get_theme_editorial_by_slug,
+    get_theme_membership_by_slug,
+    resolve_effective_theme_membership,
+    resolve_effective_theme_memberships,
+    reviewable_theme_slugs,
+    sync_theme_memberships,
+    theme_review_state,
+)
 from poi_curator_domain.themes import THEME_LABELS, is_query_theme_active
 from shapely.geometry import Point
 from sqlalchemy import cast, func, select
@@ -397,6 +413,163 @@ def get_admin_poi_evidence(
     )
 
 
+def get_admin_theme_summaries(
+    db: Session,
+    *,
+    city: str | None,
+) -> list[AdminThemeSummaryItem]:
+    pois = _load_admin_theme_pois(db, city=city)
+    counts_by_theme: dict[str, dict[str, int]] = {
+        theme_slug: {
+            "automated_accepted_count": 0,
+            "automated_candidate_count": 0,
+            "reviewed_count": 0,
+            "unreviewed_count": 0,
+            "stale_count": 0,
+            "force_included_count": 0,
+            "force_excluded_count": 0,
+        }
+        for theme_slug in THEME_LABELS
+    }
+
+    for poi in pois:
+        for theme_slug in reviewable_theme_slugs(poi):
+            membership = get_theme_membership_by_slug(poi, theme_slug)
+            editorial = get_theme_editorial_by_slug(poi, theme_slug)
+            if membership is not None:
+                if membership.status == "accepted":
+                    counts_by_theme[theme_slug]["automated_accepted_count"] += 1
+                elif membership.status == "candidate":
+                    counts_by_theme[theme_slug]["automated_candidate_count"] += 1
+
+            review_state = theme_review_state(membership, editorial)
+            counts_by_theme[theme_slug][f"{review_state}_count"] += 1
+
+            if editorial is not None and editorial.editorial_decision == "force_include":
+                counts_by_theme[theme_slug]["force_included_count"] += 1
+            if editorial is not None and editorial.editorial_decision == "force_exclude":
+                counts_by_theme[theme_slug]["force_excluded_count"] += 1
+
+    return [
+        AdminThemeSummaryItem(
+            theme_slug=theme_slug,
+            label=THEME_LABELS[theme_slug],
+            is_query_active=is_query_theme_active(theme_slug),
+            automated_accepted_count=counts["automated_accepted_count"],
+            automated_candidate_count=counts["automated_candidate_count"],
+            reviewed_count=counts["reviewed_count"],
+            unreviewed_count=counts["unreviewed_count"],
+            stale_count=counts["stale_count"],
+            force_included_count=counts["force_included_count"],
+            force_excluded_count=counts["force_excluded_count"],
+        )
+        for theme_slug, counts in counts_by_theme.items()
+    ]
+
+
+def get_admin_theme_memberships(
+    db: Session,
+    *,
+    theme_slug: str | None,
+    city: str | None,
+    automated_status: str | None,
+    review_state: str | None,
+    editorial_decision: str | None,
+    limit: int,
+) -> list[AdminThemeMembershipQueueItem]:
+    pois = _load_admin_theme_pois(db, city=city)
+    items: list[AdminThemeMembershipQueueItem] = []
+
+    for poi in pois:
+        for candidate_theme_slug in reviewable_theme_slugs(poi):
+            if theme_slug is not None and candidate_theme_slug != theme_slug:
+                continue
+            membership = get_theme_membership_by_slug(poi, candidate_theme_slug)
+            editorial = get_theme_editorial_by_slug(poi, candidate_theme_slug)
+            if membership is None and editorial is None:
+                continue
+
+            if automated_status is not None and (
+                membership is None or membership.status != automated_status
+            ):
+                continue
+            if editorial_decision is not None and (
+                editorial is None or editorial.editorial_decision != editorial_decision
+            ):
+                continue
+
+            item_review_state = theme_review_state(membership, editorial)
+            if review_state is not None and item_review_state != review_state:
+                continue
+
+            effective = resolve_effective_theme_membership(
+                candidate_theme_slug,
+                membership,
+                editorial,
+            )
+            items.append(
+                AdminThemeMembershipQueueItem(
+                    poi_id=poi.poi_id,
+                    poi_name=poi.canonical_name,
+                    city=poi.city,
+                    primary_category=poi.normalized_category,
+                    theme_slug=candidate_theme_slug,
+                    theme_label=THEME_LABELS[candidate_theme_slug],
+                    automated_status=membership.status if membership is not None else None,
+                    automated_assignment_basis=(
+                        membership.assignment_basis if membership is not None else None
+                    ),
+                    automated_confidence=(
+                        round(float(membership.confidence), 2) if membership is not None else None
+                    ),
+                    evidence_count=len(getattr(membership, "evidence_links", []) or []),
+                    computed_at=membership.computed_at if membership is not None else None,
+                    editorial_decision=(
+                        editorial.editorial_decision if editorial is not None else None
+                    ),
+                    review_state=item_review_state,
+                    reviewed_at=editorial.reviewed_at if editorial is not None else None,
+                    effective_status=effective.status if effective is not None else None,
+                )
+            )
+
+    items.sort(
+        key=lambda item: (
+            _review_state_priority(item.review_state),
+            _automated_status_priority(item.automated_status),
+            item.automated_confidence if item.automated_confidence is not None else 1.0,
+            item.poi_name.casefold(),
+        )
+    )
+    return items[:limit]
+
+
+def get_admin_theme_membership_detail(
+    db: Session,
+    *,
+    poi_id: str,
+    theme_slug: str,
+) -> AdminThemeMembershipDetailResponse | None:
+    poi = db.scalar(
+        select(POI)
+        .where(POI.poi_id == poi_id)
+        .options(
+            joinedload(POI.evidence_items),
+            joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
+            joinedload(POI.theme_editorials),
+        )
+    )
+    if poi is None:
+        return None
+
+    _ensure_theme_memberships(db, [poi])
+    membership = get_theme_membership_by_slug(poi, theme_slug)
+    editorial = get_theme_editorial_by_slug(poi, theme_slug)
+    if membership is None and editorial is None:
+        return None
+    return _build_admin_theme_membership_detail(poi, theme_slug)
+
+
 def get_admin_match_diagnostics(
     db: Session,
     *,
@@ -572,10 +745,12 @@ def _poi_matches_theme(poi: POI, theme: str | None) -> bool:
         return True
     if not is_query_theme_active(theme):
         return False
-    return any(
-        membership.theme_slug == theme and membership.status == "accepted"
-        for membership in getattr(poi, "theme_memberships", []) or []
+    resolved = resolve_effective_theme_membership(
+        theme,
+        get_theme_membership_by_slug(poi, theme),
+        get_theme_editorial_by_slug(poi, theme),
     )
+    return resolved is not None and resolved.status == "accepted"
 
 
 def _build_theme_items(poi: POI) -> list[POIThemeItem]:
@@ -584,37 +759,129 @@ def _build_theme_items(poi: POI) -> list[POIThemeItem]:
         str(editorial.theme_slug): editorial for editorial in getattr(poi, "theme_editorials", []) or []
     }
     items: list[POIThemeItem] = []
-    for membership in sorted(
-        getattr(poi, "theme_memberships", []) or [],
-        key=lambda item: (item.theme_slug != "water", item.theme_slug),
+    resolved_memberships = resolve_effective_theme_memberships(poi)
+    for theme_slug, membership in sorted(
+        resolved_memberships.items(),
+        key=lambda item: (item[0] != "water", item[0]),
     ):
-        editorial = editorial_by_slug.get(str(membership.theme_slug))
+        if membership.status == "suppressed":
+            continue
+        automated_membership = get_theme_membership_by_slug(poi, theme_slug)
+        editorial = editorial_by_slug.get(str(theme_slug))
         items.append(
             POIThemeItem(
-                theme_slug=membership.theme_slug,
-                label=THEME_LABELS.get(membership.theme_slug, membership.theme_slug),
+                theme_slug=theme_slug,
+                label=THEME_LABELS.get(theme_slug, theme_slug),
                 status=membership.status,
                 assignment_basis=membership.assignment_basis,
                 confidence=membership.confidence,
                 rationale_summary=membership.rationale_summary,
-                is_query_active=is_query_theme_active(membership.theme_slug),
+                is_query_active=is_query_theme_active(theme_slug),
                 editorial_decision=(
                     editorial.editorial_decision if editorial is not None else None
                 ),
-                evidence=[
-                    ThemeEvidenceReference(
-                        evidence_id=link.poi_evidence_id,
-                        source_id=evidence_by_id[link.poi_evidence_id].source_id,
-                        evidence_type=evidence_by_id[link.poi_evidence_id].evidence_type,
-                        label=evidence_by_id[link.poi_evidence_id].evidence_label,
-                        confidence=evidence_by_id[link.poi_evidence_id].confidence,
-                    )
-                    for link in sorted(
-                        membership.evidence_links,
-                        key=lambda item: item.poi_evidence_id,
-                    )
-                    if link.poi_evidence_id in evidence_by_id
-                ],
+                evidence=_build_theme_evidence_references(automated_membership, evidence_by_id),
             )
         )
     return items
+
+
+def _load_admin_theme_pois(
+    db: Session,
+    *,
+    city: str | None,
+) -> list[POI]:
+    query = select(POI).options(
+        joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
+        joinedload(POI.theme_editorials),
+    )
+    if city is not None:
+        query = query.where(POI.city == city)
+    pois = db.execute(query.order_by(POI.updated_at.desc())).unique().scalars().all()
+    _ensure_theme_memberships(db, pois)
+    return pois
+
+
+def _build_admin_theme_membership_detail(
+    poi: POI,
+    theme_slug: str,
+) -> AdminThemeMembershipDetailResponse:
+    evidence_by_id = {item.id: item for item in getattr(poi, "evidence_items", []) or []}
+    membership = get_theme_membership_by_slug(poi, theme_slug)
+    editorial = get_theme_editorial_by_slug(poi, theme_slug)
+    effective = resolve_effective_theme_membership(theme_slug, membership, editorial)
+
+    automated_membership = None
+    if membership is not None:
+        automated_membership = AdminThemeAutomatedMembership(
+            status=membership.status,
+            assignment_basis=membership.assignment_basis,
+            confidence=round(float(membership.confidence), 2),
+            rationale_summary=membership.rationale_summary,
+            computed_at=membership.computed_at,
+            evidence=_build_theme_evidence_references(membership, evidence_by_id),
+        )
+
+    editorial_record = None
+    if editorial is not None:
+        editorial_record = AdminThemeEditorialRecord(
+            editorial_decision=editorial.editorial_decision,
+            notes=editorial.notes,
+            reviewed_by=editorial.reviewed_by,
+            reviewed_at=editorial.reviewed_at,
+            reviewed_membership_computed_at=editorial.reviewed_membership_computed_at,
+        )
+
+    effective_outcome = None
+    if effective is not None:
+        effective_outcome = AdminThemeEffectiveOutcome(
+            status=effective.status,
+            assignment_basis=effective.assignment_basis,
+            confidence=effective.confidence,
+            rationale_summary=effective.rationale_summary,
+        )
+
+    return AdminThemeMembershipDetailResponse(
+        poi_id=poi.poi_id,
+        poi_name=poi.canonical_name,
+        city=poi.city,
+        primary_category=poi.normalized_category,
+        theme_slug=theme_slug,
+        theme_label=THEME_LABELS.get(theme_slug, theme_slug),
+        is_query_active=is_query_theme_active(theme_slug),
+        automated_membership=automated_membership,
+        editorial_record=editorial_record,
+        effective_outcome=effective_outcome,
+    )
+
+
+def _build_theme_evidence_references(
+    membership: POIThemeMembership | None,
+    evidence_by_id: dict[int, POIEvidence],
+) -> list[ThemeEvidenceReference]:
+    if membership is None:
+        return []
+    return [
+        ThemeEvidenceReference(
+            evidence_id=link.poi_evidence_id,
+            source_id=evidence_by_id[link.poi_evidence_id].source_id,
+            evidence_type=evidence_by_id[link.poi_evidence_id].evidence_type,
+            label=evidence_by_id[link.poi_evidence_id].evidence_label,
+            confidence=evidence_by_id[link.poi_evidence_id].confidence,
+        )
+        for link in sorted(
+            getattr(membership, "evidence_links", []) or [],
+            key=lambda item: item.poi_evidence_id,
+        )
+        if link.poi_evidence_id in evidence_by_id
+    ]
+
+
+def _review_state_priority(review_state: str) -> int:
+    priorities = {"unreviewed": 0, "stale": 1, "reviewed": 2}
+    return priorities.get(review_state, 3)
+
+
+def _automated_status_priority(status: str | None) -> int:
+    priorities = {"candidate": 0, "accepted": 1}
+    return priorities.get(status, 2)

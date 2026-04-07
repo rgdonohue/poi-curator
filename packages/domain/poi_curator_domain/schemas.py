@@ -3,7 +3,7 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, Field, field_validator
 
-from poi_curator_domain.themes import ThemeSlug, is_query_theme_active
+from poi_curator_domain.themes import ThemeEditorialDecision, ThemeSlug, is_query_theme_active
 
 
 class GeoLineString(BaseModel):
@@ -238,6 +238,87 @@ class AdminPOIEvidenceResponse(BaseModel):
     aliases: list[AdminPOIAliasItem]
     evidence: list[AdminPOIEvidenceItem]
     themes: list[POIThemeItem] = Field(default_factory=list)
+
+
+class AdminThemeSummaryItem(BaseModel):
+    theme_slug: ThemeSlug
+    label: str
+    is_query_active: bool
+    automated_accepted_count: int
+    automated_candidate_count: int
+    reviewed_count: int
+    unreviewed_count: int
+    stale_count: int
+    force_included_count: int
+    force_excluded_count: int
+
+
+class AdminThemeMembershipQueueItem(BaseModel):
+    poi_id: str
+    poi_name: str
+    city: str
+    primary_category: str
+    theme_slug: ThemeSlug
+    theme_label: str
+    automated_status: str | None = None
+    automated_assignment_basis: str | None = None
+    automated_confidence: float | None = None
+    evidence_count: int = 0
+    computed_at: datetime | None = None
+    editorial_decision: str | None = None
+    review_state: str
+    reviewed_at: datetime | None = None
+    effective_status: str | None = None
+
+
+class AdminThemeAutomatedMembership(BaseModel):
+    status: str
+    assignment_basis: str
+    confidence: float
+    rationale_summary: str | None = None
+    computed_at: datetime
+    evidence: list[ThemeEvidenceReference] = Field(default_factory=list)
+
+
+class AdminThemeEditorialRecord(BaseModel):
+    editorial_decision: ThemeEditorialDecision | None = None
+    notes: str | None = None
+    reviewed_by: str | None = None
+    reviewed_at: datetime | None = None
+    reviewed_membership_computed_at: datetime | None = None
+
+
+class AdminThemeEffectiveOutcome(BaseModel):
+    status: str
+    assignment_basis: str
+    confidence: float
+    rationale_summary: str | None = None
+
+
+class AdminThemeMembershipDetailResponse(BaseModel):
+    poi_id: str
+    poi_name: str
+    city: str
+    primary_category: str
+    theme_slug: ThemeSlug
+    theme_label: str
+    is_query_active: bool
+    automated_membership: AdminThemeAutomatedMembership | None = None
+    editorial_record: AdminThemeEditorialRecord | None = None
+    effective_outcome: AdminThemeEffectiveOutcome | None = None
+
+
+class AdminThemeReviewRequest(BaseModel):
+    editorial_decision: ThemeEditorialDecision | None = None
+    notes: str | None = None
+    reviewed_by: str | None = None
+
+
+class AdminThemeReviewResponse(BaseModel):
+    poi_id: str
+    theme_slug: ThemeSlug
+    reviewed: bool
+    detail: AdminThemeMembershipDetailResponse
 
 
 class AdminMatchDiagnosticItem(BaseModel):

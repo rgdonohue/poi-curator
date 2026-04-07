@@ -15,12 +15,15 @@ from poi_curator_domain.db import (
     POIAlias,
     POIEvidence,
     POISignals,
+    POIThemeEditorial,
+    POIThemeMembership,
+    POIThemeMembershipEvidence,
     SourceRegistry,
     get_session_factory,
 )
 from poi_curator_enrichment.historic_register import NM_STATE_REGISTER_SOURCE_ID
 from shapely.geometry import Point
-from sqlalchemy import delete, text
+from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 
 client = TestClient(app)
@@ -72,7 +75,14 @@ def editorial_db() -> Iterator[EditorialDBFixture]:
             created_source = True
             session.commit()
 
-    def create_case(*, external_name: str, other_names: str | None = None) -> EditorialCase:
+    def create_case(
+        *,
+        external_name: str,
+        other_names: str | None = None,
+        raw_tag_summary_json: dict | None = None,
+        normalized_category: str = "history",
+        normalized_subcategory: str = "historic_site",
+    ) -> EditorialCase:
         suffix = uuid4().hex[:8]
         poi_id = str(uuid4())
         slug = f"editorial-test-{suffix}"
@@ -88,12 +98,12 @@ def editorial_db() -> Iterator[EditorialDBFixture]:
                 city=region,
                 region=region,
                 country="USA",
-                normalized_category="history",
-                normalized_subcategory="historic_site",
+                normalized_category=normalized_category,
+                normalized_subcategory=normalized_subcategory,
                 display_categories=["history"],
                 short_description="Test historic site.",
                 primary_source="test",
-                raw_tag_summary_json={},
+                raw_tag_summary_json=raw_tag_summary_json or {},
                 historical_flag=True,
                 cultural_flag=False,
                 scenic_flag=False,
@@ -178,6 +188,17 @@ def editorial_db() -> Iterator[EditorialDBFixture]:
                 )
             )
         if created_poi_ids:
+            session.execute(
+                delete(POIThemeMembershipEvidence).where(
+                    POIThemeMembershipEvidence.membership_id.in_(
+                        select(POIThemeMembership.id).where(
+                            POIThemeMembership.poi_id.in_(created_poi_ids)
+                        )
+                    )
+                )
+            )
+            session.execute(delete(POIThemeEditorial).where(POIThemeEditorial.poi_id.in_(created_poi_ids)))
+            session.execute(delete(POIThemeMembership).where(POIThemeMembership.poi_id.in_(created_poi_ids)))
             session.execute(delete(POIEvidence).where(POIEvidence.poi_id.in_(created_poi_ids)))
             session.execute(delete(POIAlias).where(POIAlias.poi_id.in_(created_poi_ids)))
             session.execute(delete(POISignals).where(POISignals.poi_id.in_(created_poi_ids)))
@@ -327,3 +348,90 @@ def test_evidence_history_remains_visible_after_manual_alias_resolution(
         item["source_id"] == NM_STATE_REGISTER_SOURCE_ID and item["match_method"] == "manual_alias"
         for item in payload["evidence"]
     )
+
+
+def test_theme_membership_detail_shows_automated_editorial_and_effective_layers(
+    editorial_db: EditorialDBFixture,
+) -> None:
+    case = editorial_db["create_case"](
+        external_name="Theme Review Water Case",
+        raw_tag_summary_json={"name": "Acequia Madre", "man_made": "canal"},
+        normalized_category="civic",
+        normalized_subcategory="infrastructure_landmark",
+    )
+
+    review_response = client.put(
+        f"/v1/admin/poi/{case['poi_id']}/themes/water/review",
+        json={"editorial_decision": "force_exclude", "notes": "Too generic in context."},
+    )
+    assert review_response.status_code == 200
+
+    detail_response = client.get(f"/v1/admin/poi/{case['poi_id']}/themes/water")
+    assert detail_response.status_code == 200
+    payload = detail_response.json()
+    assert payload["automated_membership"]["status"] == "accepted"
+    assert payload["editorial_record"]["editorial_decision"] == "force_exclude"
+    assert payload["effective_outcome"]["status"] == "suppressed"
+
+
+def test_theme_review_endpoint_marks_reviewed_without_override(
+    editorial_db: EditorialDBFixture,
+) -> None:
+    case = editorial_db["create_case"](
+        external_name="Theme Review Rail Case",
+        raw_tag_summary_json={"name": "Depot", "historic": "railway_station"},
+    )
+
+    response = client.put(
+        f"/v1/admin/poi/{case['poi_id']}/themes/rail/review",
+        json={"notes": "Automated call looks correct.", "reviewed_by": "tester"},
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["detail"]["editorial_record"]["editorial_decision"] is None
+    assert payload["detail"]["effective_outcome"]["status"] == "accepted"
+
+    with get_session_factory()() as session:
+        row = session.execute(
+            text(
+                "select editorial_decision, reviewed_by, reviewed_membership_computed_at "
+                "from poi_theme_editorial where poi_id = :poi_id and theme_slug = 'rail'"
+            ),
+            {"poi_id": case["poi_id"]},
+        ).mappings().one()
+        membership = session.execute(
+            text(
+                "select computed_at from poi_theme_membership "
+                "where poi_id = :poi_id and theme_slug = 'rail'"
+            ),
+            {"poi_id": case["poi_id"]},
+        ).mappings().one()
+        assert row["editorial_decision"] is None
+        assert row["reviewed_by"] == "tester"
+        assert row["reviewed_membership_computed_at"] == membership["computed_at"]
+
+
+def test_theme_membership_queue_and_summary_surface_review_state(
+    editorial_db: EditorialDBFixture,
+) -> None:
+    case = editorial_db["create_case"](
+        external_name="Theme Queue Case",
+        raw_tag_summary_json={"name": "Acequia Madre", "man_made": "canal"},
+        normalized_category="civic",
+        normalized_subcategory="infrastructure_landmark",
+    )
+
+    queue_response = client.get(f"/v1/admin/theme-memberships?city={case['region']}")
+    assert queue_response.status_code == 200
+    queue_items = queue_response.json()
+    water_item = next(item for item in queue_items if item["theme_slug"] == "water")
+    assert water_item["review_state"] == "unreviewed"
+    assert water_item["effective_status"] == "accepted"
+
+    summary_response = client.get(f"/v1/admin/themes?city={case['region']}")
+    assert summary_response.status_code == 200
+    summary_items = summary_response.json()
+    water_summary = next(item for item in summary_items if item["theme_slug"] == "water")
+    assert water_summary["automated_accepted_count"] >= 1
+    assert water_summary["unreviewed_count"] >= 1

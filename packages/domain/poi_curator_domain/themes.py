@@ -5,7 +5,8 @@ from typing import Literal
 ThemeSlug = Literal["water", "rail", "public_memory"]
 ThemeStatus = Literal["candidate", "accepted", "suppressed"]
 ThemeAssignmentBasis = Literal["rule", "evidence", "editorial", "mixed"]
-ThemeEditorialDecision = Literal["force_include", "force_exclude", "needs_review"]
+ThemeEditorialDecision = Literal["force_include", "force_exclude"]
+ThemeReviewState = Literal["unreviewed", "reviewed", "stale"]
 
 
 @dataclass(frozen=True)

@@ -15,6 +15,11 @@ from poi_curator_domain.schemas import (
     AdminPOIPatchResponse,
     AdminResolveDiagnosticRequest,
     AdminSuppressDiagnosticRequest,
+    AdminThemeMembershipDetailResponse,
+    AdminThemeMembershipQueueItem,
+    AdminThemeReviewRequest,
+    AdminThemeReviewResponse,
+    AdminThemeSummaryItem,
 )
 
 from poi_curator_api.dependencies import DatabaseSession, ScoringBackendDep
@@ -40,6 +45,82 @@ def patch_admin_poi(
     backend: ScoringBackendDep,
 ) -> AdminPOIPatchResponse:
     response = backend.patch_admin_poi(db, poi_id, payload)
+    if response is None:
+        raise HTTPException(status_code=404, detail="POI not found")
+    return response
+
+
+@router.get("/themes", response_model=list[AdminThemeSummaryItem])
+def admin_theme_summaries(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    city: str | None = Query(default=None),
+) -> list[AdminThemeSummaryItem]:
+    return backend.get_admin_theme_summaries(db, city=city)
+
+
+@router.get("/theme-memberships", response_model=list[AdminThemeMembershipQueueItem])
+def admin_theme_memberships(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    theme_slug: str | None = Query(default=None),
+    city: str | None = Query(default=None),
+    automated_status: str | None = Query(default=None),
+    review_state: str | None = Query(default=None),
+    editorial_decision: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+) -> list[AdminThemeMembershipQueueItem]:
+    return backend.get_admin_theme_memberships(
+        db,
+        theme_slug=theme_slug,
+        city=city,
+        automated_status=automated_status,
+        review_state=review_state,
+        editorial_decision=editorial_decision,
+        limit=limit,
+    )
+
+
+@router.get(
+    "/poi/{poi_id}/themes/{theme_slug}",
+    response_model=AdminThemeMembershipDetailResponse,
+)
+def admin_theme_membership_detail(
+    poi_id: str,
+    theme_slug: str,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> AdminThemeMembershipDetailResponse:
+    response = backend.get_admin_theme_membership_detail(
+        db,
+        poi_id=poi_id,
+        theme_slug=theme_slug,
+    )
+    if response is None:
+        raise HTTPException(status_code=404, detail="Theme membership not found")
+    return response
+
+
+@router.put(
+    "/poi/{poi_id}/themes/{theme_slug}/review",
+    response_model=AdminThemeReviewResponse,
+)
+def review_admin_theme_membership(
+    poi_id: str,
+    theme_slug: str,
+    payload: AdminThemeReviewRequest,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> AdminThemeReviewResponse:
+    try:
+        response = backend.review_theme_membership(
+            db,
+            poi_id=poi_id,
+            theme_slug=theme_slug,
+            payload=payload,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     if response is None:
         raise HTTPException(status_code=404, detail="POI not found")
     return response

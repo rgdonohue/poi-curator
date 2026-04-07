@@ -12,6 +12,11 @@ from poi_curator_domain.schemas import (
     AdminPOIPatchResponse,
     AdminResolveDiagnosticRequest,
     AdminSuppressDiagnosticRequest,
+    AdminThemeMembershipDetailResponse,
+    AdminThemeMembershipQueueItem,
+    AdminThemeReviewRequest,
+    AdminThemeReviewResponse,
+    AdminThemeSummaryItem,
     NearbySuggestRequest,
     NearbySuggestResponse,
     POIDetailResponse,
@@ -72,6 +77,46 @@ class ScoringBackend(Protocol):
         poi_id: str,
         payload: AdminPOIPatchRequest,
     ) -> AdminPOIPatchResponse | None:
+        ...
+
+    def get_admin_theme_summaries(
+        self,
+        db: Session,
+        *,
+        city: str | None,
+    ) -> list[AdminThemeSummaryItem]:
+        ...
+
+    def get_admin_theme_memberships(
+        self,
+        db: Session,
+        *,
+        theme_slug: str | None,
+        city: str | None,
+        automated_status: str | None,
+        review_state: str | None,
+        editorial_decision: str | None,
+        limit: int,
+    ) -> list[AdminThemeMembershipQueueItem]:
+        ...
+
+    def get_admin_theme_membership_detail(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+    ) -> AdminThemeMembershipDetailResponse | None:
+        ...
+
+    def review_theme_membership(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+        payload: AdminThemeReviewRequest,
+    ) -> AdminThemeReviewResponse | None:
         ...
 
     def resolve_match_diagnostic(
@@ -172,6 +217,50 @@ class FixtureScoringBackend:
             persisted=False,
             message="Scaffold response only. Persistence will be added with the editorial layer.",
         )
+
+    def get_admin_theme_summaries(
+        self,
+        db: Session,
+        *,
+        city: str | None,
+    ) -> list[AdminThemeSummaryItem]:
+        del db, city
+        return []
+
+    def get_admin_theme_memberships(
+        self,
+        db: Session,
+        *,
+        theme_slug: str | None,
+        city: str | None,
+        automated_status: str | None,
+        review_state: str | None,
+        editorial_decision: str | None,
+        limit: int,
+    ) -> list[AdminThemeMembershipQueueItem]:
+        del db, theme_slug, city, automated_status, review_state, editorial_decision, limit
+        return []
+
+    def get_admin_theme_membership_detail(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+    ) -> AdminThemeMembershipDetailResponse | None:
+        del db, poi_id, theme_slug
+        return None
+
+    def review_theme_membership(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+        payload: AdminThemeReviewRequest,
+    ) -> AdminThemeReviewResponse | None:
+        del db, poi_id, theme_slug, payload
+        return None
 
     def resolve_match_diagnostic(
         self,
@@ -335,6 +424,129 @@ class HybridScoringBackend(FixtureScoringBackend):
         if response is not None or not self.allow_fixture_fallback:
             return response
         return super().patch_admin_poi(db, poi_id, payload)
+
+    def get_admin_theme_summaries(
+        self,
+        db: Session,
+        *,
+        city: str | None,
+    ) -> list[AdminThemeSummaryItem]:
+        try:
+            items = query_service.get_admin_theme_summaries(db, city=city)
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_theme_summaries(db, city=city)
+        if items or not self.allow_fixture_fallback:
+            return items
+        return super().get_admin_theme_summaries(db, city=city)
+
+    def get_admin_theme_memberships(
+        self,
+        db: Session,
+        *,
+        theme_slug: str | None,
+        city: str | None,
+        automated_status: str | None,
+        review_state: str | None,
+        editorial_decision: str | None,
+        limit: int,
+    ) -> list[AdminThemeMembershipQueueItem]:
+        try:
+            items = query_service.get_admin_theme_memberships(
+                db,
+                theme_slug=theme_slug,
+                city=city,
+                automated_status=automated_status,
+                review_state=review_state,
+                editorial_decision=editorial_decision,
+                limit=limit,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_theme_memberships(
+                db,
+                theme_slug=theme_slug,
+                city=city,
+                automated_status=automated_status,
+                review_state=review_state,
+                editorial_decision=editorial_decision,
+                limit=limit,
+            )
+        if items or not self.allow_fixture_fallback:
+            return items
+        return super().get_admin_theme_memberships(
+            db,
+            theme_slug=theme_slug,
+            city=city,
+            automated_status=automated_status,
+            review_state=review_state,
+            editorial_decision=editorial_decision,
+            limit=limit,
+        )
+
+    def get_admin_theme_membership_detail(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+    ) -> AdminThemeMembershipDetailResponse | None:
+        try:
+            response = query_service.get_admin_theme_membership_detail(
+                db,
+                poi_id=poi_id,
+                theme_slug=theme_slug,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_theme_membership_detail(
+                db,
+                poi_id=poi_id,
+                theme_slug=theme_slug,
+            )
+        if response is not None or not self.allow_fixture_fallback:
+            return response
+        return super().get_admin_theme_membership_detail(
+            db,
+            poi_id=poi_id,
+            theme_slug=theme_slug,
+        )
+
+    def review_theme_membership(
+        self,
+        db: Session,
+        *,
+        poi_id: str,
+        theme_slug: str,
+        payload: AdminThemeReviewRequest,
+    ) -> AdminThemeReviewResponse | None:
+        try:
+            response = editorial_service.review_theme_membership(
+                db,
+                poi_id=poi_id,
+                theme_slug=theme_slug,
+                payload=payload,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().review_theme_membership(
+                db,
+                poi_id=poi_id,
+                theme_slug=theme_slug,
+                payload=payload,
+            )
+        if response is not None or not self.allow_fixture_fallback:
+            return response
+        return super().review_theme_membership(
+            db,
+            poi_id=poi_id,
+            theme_slug=theme_slug,
+            payload=payload,
+        )
 
     def resolve_match_diagnostic(
         self,

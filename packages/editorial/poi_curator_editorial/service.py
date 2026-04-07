@@ -2,7 +2,13 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING
 
-from poi_curator_domain.db import POI, OfficialMatchDiagnostic, POIAlias, POIEvidence
+from poi_curator_domain.db import (
+    POI,
+    OfficialMatchDiagnostic,
+    POIAlias,
+    POIEvidence,
+    POIThemeEditorial,
+)
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
     AdminAliasFromDiagnosticRequest,
@@ -11,13 +17,23 @@ from poi_curator_domain.schemas import (
     AdminPOIAliasItem,
     AdminResolveDiagnosticRequest,
     AdminSuppressDiagnosticRequest,
+    AdminThemeReviewRequest,
+    AdminThemeReviewResponse,
+)
+from poi_curator_domain.theme_service import (
+    get_theme_editorial_by_slug,
+    get_theme_membership_by_slug,
+    sync_theme_memberships,
 )
 from poi_curator_enrichment.pipeline import (
     build_nrhp_evidence,
     build_state_register_evidence,
     recompute_evidence_signals,
 )
-from poi_curator_scoring.query_service import build_admin_match_diagnostic_item
+from poi_curator_scoring.query_service import (
+    build_admin_match_diagnostic_item,
+    get_admin_theme_membership_detail,
+)
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
@@ -182,6 +198,71 @@ def add_poi_alias(
             created_at=alias.created_at,
         ),
         created=created,
+    )
+
+
+def review_theme_membership(
+    db: Session,
+    poi_id: str,
+    theme_slug: str,
+    payload: AdminThemeReviewRequest,
+) -> AdminThemeReviewResponse | None:
+    poi = db.scalar(
+        select(POI)
+        .where(POI.poi_id == poi_id)
+        .options(
+            joinedload(POI.aliases),
+            joinedload(POI.evidence_items),
+            joinedload(POI.theme_memberships),
+            joinedload(POI.theme_editorials),
+        )
+    )
+    if poi is None:
+        return None
+
+    if sync_theme_memberships(db, [poi]):
+        db.flush()
+
+    membership = get_theme_membership_by_slug(poi, theme_slug)
+    if membership is None and payload.editorial_decision != "force_include":
+        raise ValueError(
+            "No automated theme membership exists for this POI/theme pair. "
+            "Use force_include to create a manual inclusion."
+        )
+
+    editorial = get_theme_editorial_by_slug(poi, theme_slug)
+    if editorial is None:
+        editorial = POIThemeEditorial(poi_id=poi.poi_id, theme_slug=theme_slug)
+        db.add(editorial)
+        poi.theme_editorials.append(editorial)
+
+    now = datetime.now(UTC)
+    editorial.editorial_decision = payload.editorial_decision
+    editorial.notes = payload.notes
+    editorial.reviewed_by = payload.reviewed_by
+    editorial.reviewed_at = now
+    editorial.reviewed_membership_computed_at = (
+        membership.computed_at if membership is not None else None
+    )
+    db.commit()
+
+    log_event(
+        logger,
+        "theme_membership_reviewed",
+        poi_id=poi.poi_id,
+        theme_slug=theme_slug,
+        editorial_decision=payload.editorial_decision,
+        reviewed_by=payload.reviewed_by,
+    )
+
+    detail = get_admin_theme_membership_detail(db, poi_id=poi.poi_id, theme_slug=theme_slug)
+    if detail is None:
+        raise ValueError("Theme review was saved, but the detail view could not be rebuilt.")
+    return AdminThemeReviewResponse(
+        poi_id=poi.poi_id,
+        theme_slug=theme_slug,
+        reviewed=True,
+        detail=detail,
     )
 
 

@@ -315,10 +315,13 @@ class POIThemeEditorial(Base):
         ForeignKey("theme_definition.theme_slug"),
         primary_key=True,
     )
-    editorial_decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    editorial_decision: Mapped[str | None] = mapped_column(String(32))
     notes: Mapped[str | None] = mapped_column(Text)
     reviewed_by: Mapped[str | None] = mapped_column(String(255))
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    reviewed_membership_computed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True)
+    )
 
     poi: Mapped[POI] = relationship(back_populates="theme_editorials")
     theme: Mapped[ThemeDefinition] = relationship(back_populates="editorial_overrides")
