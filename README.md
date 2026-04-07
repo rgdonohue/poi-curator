@@ -66,7 +66,25 @@ make lint
 make typecheck
 make ingest-osm
 make enrich
+python3 scripts/run_check_suite.py --suite core-product
 ```
+
+## Check Suite Runner
+
+For grouped review output, use the Python suite runner on top of `poi-curator-check`:
+
+```bash
+python3 scripts/run_check_suite.py --list-suites
+python3 scripts/run_check_suite.py --suite rail-smoke
+python3 scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails --split-cases
+```
+
+It writes timestamped grouped outputs under `reports/check_runs/<timestamp>/`:
+
+- one JSON report per suite
+- one Markdown report per suite
+- an `index.md` summary across the suite run
+- optional per-case JSON and Markdown files with `--split-cases`
 
 ## Repository Layout
 

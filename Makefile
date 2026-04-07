@@ -1,4 +1,4 @@
-.PHONY: install db-up db-down migrate api test lint typecheck ingest-osm enrich eval-routes
+.PHONY: install db-up db-down migrate api test lint typecheck ingest-osm enrich eval-routes check-suites
 
 install:
 	python3 -m pip install -e ".[dev]"
@@ -32,3 +32,6 @@ enrich:
 
 eval-routes:
 	poi-curator-eval routes --fixtures data/fixtures/routes_santa_fe.json
+
+check-suites:
+	python3 scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails
