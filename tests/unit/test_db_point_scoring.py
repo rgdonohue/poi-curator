@@ -290,7 +290,12 @@ def test_mixed_rail_query_prefers_depot_anchor_over_rule_only_trace() -> None:
             quality_score=85.0,
             editorial=None,
             signals=SimpleNamespace(genericity_penalty=0.0),
-            theme_memberships=[make_rail_membership(assignment_basis="mixed", evidence_links=[object()])],
+            theme_memberships=[
+                make_rail_membership(
+                    assignment_basis="mixed",
+                    evidence_links=[object()],
+                )
+            ],
         ),
     )
     trace = cast(
@@ -331,6 +336,82 @@ def test_mixed_rail_query_prefers_depot_anchor_over_rule_only_trace() -> None:
     assert depot_breakdown["rail_anchor_bonus"] == 4.0
     assert trace_breakdown["rail_trace_guardrail"] == -3.0
     assert depot_score > trace_score
+
+
+def test_mixed_rail_nearby_prefers_depot_anchor_over_repurposed_corridor_read() -> None:
+    payload = make_payload(category="mixed").model_copy(update={"theme": "rail"})
+    depot = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Atchison, Topeka & Santa Fe Railway Depot",
+            normalized_category="history",
+            normalized_subcategory="historic_site",
+            display_categories=["history", "civic"],
+            raw_tag_summary_json={
+                "name": "Atchison, Topeka & Santa Fe Railway Depot",
+                "historic": "railway_station",
+            },
+            drive_affinity_hint=0.6,
+            walk_affinity_hint=0.55,
+            base_significance_score=68.0,
+            quality_score=57.5,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+            theme_memberships=[
+                make_rail_membership(
+                    assignment_basis="mixed",
+                    evidence_links=[object()],
+                )
+            ],
+        ),
+    )
+    repurposed_corridor = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Santa Fe Railyard Park",
+            normalized_category="scenic",
+            normalized_subcategory="trail_river_access",
+            display_categories=["scenic", "history"],
+            raw_tag_summary_json={"name": "Santa Fe Railyard Park", "leisure": "park"},
+            drive_affinity_hint=0.8,
+            walk_affinity_hint=0.75,
+            base_significance_score=52.0,
+            quality_score=67.5,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.15),
+            theme_memberships=[
+                make_rail_membership(
+                    assignment_basis="mixed",
+                    evidence_links=[object()],
+                )
+            ],
+        ),
+    )
+    depot_metrics = PointCandidateMetrics(
+        distance_from_point_m=707,
+        estimated_access_m=707,
+        estimated_access_minutes=9,
+        proximity_score=3.86,
+        radius_fit_score=2.57,
+    )
+    repurposed_corridor_metrics = PointCandidateMetrics(
+        distance_from_point_m=252,
+        estimated_access_m=252,
+        estimated_access_minutes=3,
+        proximity_score=12.96,
+        radius_fit_score=8.64,
+    )
+
+    depot_score, depot_breakdown, _ = score_point_candidate(depot, payload, depot_metrics)
+    corridor_score, corridor_breakdown, _ = score_point_candidate(
+        repurposed_corridor,
+        payload,
+        repurposed_corridor_metrics,
+    )
+
+    assert depot_breakdown["nearby_rail_anchor_prominence"] == 8.0
+    assert corridor_breakdown["nearby_rail_anchor_prominence"] == 0.0
+    assert depot_score > corridor_score
 
 
 def test_build_nearby_result_uses_description_hygiene_fallback() -> None:

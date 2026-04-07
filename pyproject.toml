@@ -39,6 +39,7 @@ poi-curator-api = "poi_curator_api.main:serve"
 poi-curator-ingest = "poi_curator_ingestion.cli:app"
 poi-curator-enrich = "poi_curator_enrichment.cli:app"
 poi-curator-eval = "poi_curator_scoring.cli:app"
+poi-curator-check = "poi_curator_scoring.check_cli:app"
 
 [tool.setuptools]
 include-package-data = true

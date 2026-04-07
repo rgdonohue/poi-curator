@@ -160,6 +160,22 @@ def compute_theme_context_components(
     }
 
 
+def compute_point_theme_context_components(
+    poi: POI,
+    *,
+    requested_category: str,
+    requested_theme: str | None,
+) -> dict[str, float]:
+    nearby_rail_anchor_prominence = 0.0
+
+    if requested_theme == "rail" and requested_category == "mixed" and _is_rail_anchor(poi):
+        nearby_rail_anchor_prominence = 8.0
+
+    return {
+        "nearby_rail_anchor_prominence": nearby_rail_anchor_prominence,
+    }
+
+
 def build_why_it_matters(
     poi: POI,
     *,
