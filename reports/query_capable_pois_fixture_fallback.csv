@@ -1,0 +1,6 @@
+backend,poi_id,name,city,primary_source,osm_id,wikidata_id,wikipedia_title,primary_category,display_categories,themes,lon,lat,short_description
+fixture_fallback,poi-acequia-madre,Acequia Madre,santa-fe,fixture,way/acequia-madre,Q999001,,history,history|civic,water,-105.9319,35.6828,Historic irrigation corridor that still reads the city's water geography.
+fixture_fallback,poi-santa-fe-plaza,Santa Fe Plaza,santa-fe,fixture,way/santa-fe-plaza,Q999002,,culture,culture|history|civic,,-105.9378,35.687,"Historic civic core where colonial planning, commerce, and public life still intersect."
+fixture_fallback,poi-canyon-road-corridor,Canyon Road Arts Corridor,santa-fe,fixture,way/canyon-road,,Canyon_Road,art,art|culture,,-105.917,35.6844,Dense art corridor where street sequence and galleries read as a cultural landscape.
+fixture_fallback,poi-rail-yard,Santa Fe Rail Yard District,santa-fe,fixture,way/rail-yard,Q999004,,civic,civic|history|culture,rail,-105.9495,35.6821,Former rail infrastructure turned civic corridor with strong labor and settlement traces.
+fixture_fallback,poi-cross-of-the-martyrs,Cross of the Martyrs Overlook,santa-fe,fixture,node/cross-martyrs,,Cross_of_the_Martyrs,scenic,scenic|history,,-105.9348,35.6917,Overlook with a strong topographic read on the city and visible historical framing.

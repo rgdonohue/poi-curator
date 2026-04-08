@@ -61,6 +61,7 @@ from poi_curator_scoring.db_point_scoring import (
     is_within_radius,
     score_point_candidate,
 )
+from poi_curator_scoring.place_representation import build_place_representation
 from poi_curator_scoring.db_route_scoring import (
     build_route_line,
     build_route_result,
@@ -126,8 +127,15 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         if not _poi_matches_theme(poi, payload.theme):
             continue
 
+        geometry = to_shape(poi.geom)
         centroid = to_shape(poi.centroid)
-        metrics = compute_candidate_metrics(payload, route_line, centroid)
+        representation = build_place_representation(
+            poi,
+            geometry,
+            query_geometry=route_line,
+            fallback_point=centroid,
+        )
+        metrics = compute_candidate_metrics(payload, route_line, representation.anchor_point)
         if not is_within_budget(payload, metrics):
             continue
 
@@ -137,12 +145,13 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
                 score,
                 build_route_result(
                     poi,
-                    centroid,
+                    representation.anchor_point,
                     metrics,
                     score,
                     score_breakdown,
                     category_match,
                     requested_theme=payload.theme,
+                    extended_place=representation.extended_place,
                 ),
             )
         )
@@ -223,8 +232,15 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         if not _poi_matches_theme(poi, payload.theme):
             continue
 
+        geometry = to_shape(poi.geom)
         centroid = to_shape(poi.centroid)
-        metrics = compute_point_candidate_metrics(payload, query_point, centroid)
+        representation = build_place_representation(
+            poi,
+            geometry,
+            query_geometry=query_point,
+            fallback_point=centroid,
+        )
+        metrics = compute_point_candidate_metrics(payload, query_point, representation.anchor_point)
         if not is_within_radius(payload, metrics):
             continue
 
@@ -234,13 +250,14 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
                 score,
                 build_nearby_result(
                     poi,
-                    centroid,
+                    representation.anchor_point,
                     metrics,
                     score,
                     score_breakdown,
                     category_match,
                     payload.travel_mode,
                     requested_theme=payload.theme,
+                    extended_place=representation.extended_place,
                 ),
             )
         )
@@ -288,7 +305,13 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
         return None
     _ensure_theme_memberships(db, [poi])
 
+    geometry = to_shape(poi.geom)
     centroid = to_shape(poi.centroid)
+    representation = build_place_representation(
+        poi,
+        geometry,
+        fallback_point=centroid,
+    )
     return POIDetailResponse(
         poi_id=poi.poi_id,
         name=poi.canonical_name,
@@ -296,7 +319,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
         secondary_categories=[
             category for category in poi.display_categories if category != poi.normalized_category
         ],
-        coordinates=[centroid.x, centroid.y],
+        coordinates=[representation.anchor_point.x, representation.anchor_point.y],
         short_description=choose_short_description_for_poi(poi),
         why_it_matters=build_why_it_matters(poi),
         badges=build_badges(poi, include_source_badges=True),
@@ -322,6 +345,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
             )
         ],
         themes=_build_theme_items(poi),
+        extended_place=representation.extended_place,
     )
 
 
@@ -718,7 +742,7 @@ def _metric_space(expression: object) -> ColumnElement[object]:
 def _nearby_prefilter_clause(lon: float, lat: float, radius_meters: int) -> ColumnElement[bool]:
     query_point = func.ST_SetSRID(func.ST_MakePoint(lon, lat), 4326)
     return func.ST_DWithin(
-        _metric_space(POI.centroid),
+        _metric_space(POI.geom),
         _metric_space(query_point),
         radius_meters,
     )
@@ -727,7 +751,7 @@ def _nearby_prefilter_clause(lon: float, lat: float, radius_meters: int) -> Colu
 def _route_prefilter_clause(route_wkt: str, max_detour_meters: int) -> ColumnElement[bool]:
     route_geom = func.ST_GeomFromText(route_wkt, 4326)
     return func.ST_DWithin(
-        _metric_space(POI.centroid),
+        _metric_space(POI.geom),
         _metric_space(route_geom),
         max_detour_meters,
     )

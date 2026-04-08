@@ -19,7 +19,7 @@ from poi_curator_domain.db import (
     SourceRegistry,
     get_session_factory,
 )
-from shapely.geometry import Point
+from shapely.geometry import LineString, Point
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 
@@ -40,7 +40,8 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
     secondary_poi_id = str(uuid4())
     far_poi_id = str(uuid4())
     rail_poi_id = str(uuid4())
-    poi_ids = [near_poi_id, secondary_poi_id, far_poi_id, rail_poi_id]
+    corridor_poi_id = str(uuid4())
+    poi_ids = [near_poi_id, secondary_poi_id, far_poi_id, rail_poi_id, corridor_poi_id]
     source_id = f"test-city-gis-railyard-{uuid4().hex[:8]}"
     now = datetime.now(UTC)
 
@@ -182,6 +183,38 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     created_at=now,
                     updated_at=now,
                 ),
+                POI(
+                    poi_id=corridor_poi_id,
+                    canonical_name="Integration Story Corridor",
+                    slug=f"integration-story-corridor-{region}",
+                    geom=from_shape(
+                        LineString([(-105.9410, 35.6750), (-105.9360, 35.6750)]),
+                        srid=4326,
+                    ),
+                    centroid=from_shape(Point(-105.9385, 35.6750), srid=4326),
+                    city=region,
+                    region=region,
+                    country="USA",
+                    normalized_category="culture",
+                    normalized_subcategory="neighborhood_corridor",
+                    display_categories=["culture"],
+                    short_description="Linear cultural corridor for geometry-backed integration testing.",
+                    primary_source="test",
+                    raw_tag_summary_json={"name": "Integration Story Corridor"},
+                    historical_flag=False,
+                    cultural_flag=True,
+                    scenic_flag=False,
+                    infrastructure_flag=False,
+                    food_identity_flag=False,
+                    walk_affinity_hint=0.95,
+                    drive_affinity_hint=0.4,
+                    base_significance_score=68.0,
+                    quality_score=74.0,
+                    review_status="needs_review",
+                    is_active=True,
+                    created_at=now,
+                    updated_at=now,
+                ),
             ]
         )
         session.add_all(
@@ -258,6 +291,24 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     editorial_priority_seed=0.0,
                     computed_at=now,
                 ),
+                POISignals(
+                    poi_id=corridor_poi_id,
+                    source_count=1,
+                    has_wikidata=False,
+                    has_wikipedia=False,
+                    has_official_heritage_match=False,
+                    official_corroboration_score=0.0,
+                    district_membership_score=0.0,
+                    institutional_identity_score=0.0,
+                    osm_tag_richness=0.5,
+                    description_quality=0.8,
+                    entity_type_confidence=0.8,
+                    local_identity_score=0.7,
+                    interpretive_value_score=0.8,
+                    genericity_penalty=0.0,
+                    editorial_priority_seed=0.0,
+                    computed_at=now,
+                ),
             ]
         )
         session.add(
@@ -283,6 +334,7 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
         "secondary_poi_id": secondary_poi_id,
         "far_poi_id": far_poi_id,
         "rail_poi_id": rail_poi_id,
+        "corridor_poi_id": corridor_poi_id,
         "source_id": source_id,
     }
 
@@ -323,6 +375,32 @@ def test_nearby_suggest_uses_db_backed_pois(db_query_fixture: dict[str, str]) ->
     assert db_query_fixture["near_poi_id"] in result_ids
     assert db_query_fixture["far_poi_id"] not in result_ids
     assert payload["results"][0]["score_breakdown"] is not None
+
+
+def test_nearby_suggest_uses_geometry_anchor_for_corridor_features(
+    db_query_fixture: dict[str, str],
+) -> None:
+    response = client.post(
+        "/v1/nearby/suggest",
+        json={
+            "center": {"lat": 35.6750, "lon": -105.9409},
+            "travel_mode": "walking",
+            "category": "mixed",
+            "radius_meters": 60,
+            "region_hint": db_query_fixture["region"],
+            "limit": 5,
+        },
+    )
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert [item["poi_id"] for item in payload["results"]] == [db_query_fixture["corridor_poi_id"]]
+    result = payload["results"][0]
+
+    assert result["extended_place"]["place_form"] == "corridor"
+    assert result["distance_from_center_meters"] <= 20
+    assert result["coordinates"][0] == pytest.approx(-105.9409, abs=0.0002)
+    assert result["coordinates"][1] == pytest.approx(35.6750, abs=0.0002)
 
 
 def test_route_suggest_uses_db_backed_pois(db_query_fixture: dict[str, str]) -> None:

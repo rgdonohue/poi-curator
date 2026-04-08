@@ -3,7 +3,7 @@ from typing import Literal
 
 from poi_curator_domain.db import POI
 from poi_curator_domain.descriptions import choose_short_description_for_poi
-from poi_curator_domain.schemas import NearbyResult, NearbySuggestRequest
+from poi_curator_domain.schemas import ExtendedPlaceContext, NearbyResult, NearbySuggestRequest
 from shapely.geometry import Point
 
 from poi_curator_scoring.db_route_scoring import (
@@ -35,11 +35,11 @@ class PointCandidateMetrics:
 def compute_point_candidate_metrics(
     payload: NearbySuggestRequest,
     query_point: Point,
-    centroid: Point,
+    anchor_point: Point,
 ) -> PointCandidateMetrics:
     projected_query_point = project_geometry(query_point)
-    projected_centroid = project_geometry(centroid)
-    distance_m = int(round(projected_query_point.distance(projected_centroid)))
+    projected_anchor = project_geometry(anchor_point)
+    distance_m = int(round(projected_query_point.distance(projected_anchor)))
     speed_m_per_minute = 250.0 if payload.travel_mode == "driving" else 80.0
     estimated_access_minutes = max(1, int(round(distance_m / speed_m_per_minute)))
     proximity_score = max(0.0, 18.0 - (distance_m / max(payload.radius_meters, 1)) * 18.0)
@@ -118,13 +118,14 @@ def score_point_candidate(
 
 def build_nearby_result(
     poi: POI,
-    centroid: Point,
+    anchor_point: Point,
     metrics: PointCandidateMetrics,
     score: float,
     score_breakdown: dict[str, float],
     category_match: Literal["primary", "secondary", "mixed"],
     payload_mode: str,
     requested_theme: str | None = None,
+    extended_place: ExtendedPlaceContext | None = None,
 ) -> NearbyResult:
     secondary_categories = [
         category for category in poi.display_categories if category != poi.normalized_category
@@ -141,7 +142,7 @@ def build_nearby_result(
         ),
         secondary_categories=secondary_categories,
         category_match_type=category_match,
-        coordinates=[centroid.x, centroid.y],
+        coordinates=[anchor_point.x, anchor_point.y],
         short_description=choose_short_description_for_poi(poi),
         distance_from_center_meters=metrics.distance_from_point_m,
         estimated_access_m=metrics.estimated_access_m,
@@ -164,4 +165,5 @@ def build_nearby_result(
             requested_theme=requested_theme,
             theme_match=requested_theme is not None,
         ),
+        extended_place=extended_place,
     )

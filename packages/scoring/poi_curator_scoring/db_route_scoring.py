@@ -5,6 +5,7 @@ from typing import Literal
 from poi_curator_domain.db import POI
 from poi_curator_domain.descriptions import choose_short_description_for_poi
 from poi_curator_domain.schemas import (
+    ExtendedPlaceContext,
     NearbySuggestRequest,
     RouteResult,
     RouteSuggestRequest,
@@ -75,11 +76,11 @@ def category_match_type(
 def compute_candidate_metrics(
     payload: RouteSuggestRequest,
     route_line: LineString,
-    centroid: Point,
+    anchor_point: Point,
 ) -> CandidateMetrics:
     projected_route = project_geometry(route_line)
-    projected_centroid = project_geometry(centroid)
-    distance_m = int(round(projected_route.distance(projected_centroid)))
+    projected_anchor = project_geometry(anchor_point)
+    distance_m = int(round(projected_route.distance(projected_anchor)))
     estimated_detour_m = distance_m * 2
     speed_m_per_minute = 250.0 if payload.travel_mode == "driving" else 80.0
     estimated_extra_minutes = max(1, int(round(estimated_detour_m / speed_m_per_minute)))
@@ -237,12 +238,13 @@ def _passes_category_specific_eligibility(
 
 def build_route_result(
     poi: POI,
-    centroid: Point,
+    anchor_point: Point,
     metrics: CandidateMetrics,
     score: float,
     score_breakdown: dict[str, float],
     category_match: Literal["primary", "secondary", "mixed"],
     requested_theme: str | None = None,
+    extended_place: ExtendedPlaceContext | None = None,
 ) -> RouteResult:
     secondary_categories = [
         category for category in poi.display_categories if category != poi.normalized_category
@@ -259,7 +261,7 @@ def build_route_result(
         ),
         secondary_categories=secondary_categories,
         category_match_type=category_match,
-        coordinates=[centroid.x, centroid.y],
+        coordinates=[anchor_point.x, anchor_point.y],
         short_description=choose_short_description_for_poi(poi),
         distance_from_route_m=metrics.distance_from_route_m,
         estimated_detour_m=metrics.estimated_detour_m,
@@ -283,4 +285,5 @@ def build_route_result(
             requested_theme=requested_theme,
             theme_match=requested_theme is not None,
         ),
+        extended_place=extended_place,
     )

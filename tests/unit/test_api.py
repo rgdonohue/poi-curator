@@ -187,6 +187,16 @@ def test_poi_detail_endpoint_includes_evidence_field() -> None:
     assert "themes" in payload
 
 
+def test_poi_detail_endpoint_exposes_extended_place_context_for_acequia_fixture() -> None:
+    response = client.get("/v1/poi/poi-acequia-madre")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["extended_place"]["place_form"] == "corridor"
+    assert payload["extended_place"]["encounter_mode"] == "along_corridor"
+    assert payload["extended_place"]["encounter_anchors"][0]["is_primary"] is True
+
+
 def test_admin_poi_evidence_endpoint() -> None:
     response = client.get("/v1/admin/poi/poi-santa-fe-plaza/evidence")
 

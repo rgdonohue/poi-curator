@@ -1,5 +1,7 @@
 from dataclasses import dataclass
 
+from poi_curator_domain.schemas import EncounterAnchor, ExtendedPlaceContext
+
 
 @dataclass(frozen=True)
 class POIFixture:
@@ -20,6 +22,7 @@ class POIFixture:
     why_it_matters: list[str]
     provenance: dict[str, str]
     themes: list[str]
+    extended_place: ExtendedPlaceContext | None = None
 
 
 FIXTURE_POIS: list[POIFixture] = [
@@ -47,6 +50,31 @@ FIXTURE_POIS: list[POIFixture] = [
         ],
         provenance={"osm_id": "way/acequia-madre", "wikidata_id": "Q999001"},
         themes=["water"],
+        extended_place=ExtendedPlaceContext(
+            place_form="corridor",
+            encounter_mode="along_corridor",
+            display_hint=(
+                "Extended corridor; prefer encounter anchors over the centroid for map placement."
+            ),
+            encounter_anchors=[
+                EncounterAnchor(
+                    label="primary encounter",
+                    coordinates=[-105.9324, 35.6829],
+                    kind="encounter",
+                    is_primary=True,
+                ),
+                EncounterAnchor(
+                    label="corridor segment 1",
+                    coordinates=[-105.9341, 35.6817],
+                    kind="segment",
+                ),
+                EncounterAnchor(
+                    label="corridor segment 2",
+                    coordinates=[-105.9307, 35.6836],
+                    kind="segment",
+                ),
+            ],
+        ),
     ),
     POIFixture(
         poi_id="poi-santa-fe-plaza",

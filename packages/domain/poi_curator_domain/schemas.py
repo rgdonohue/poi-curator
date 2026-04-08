@@ -131,6 +131,25 @@ class POIThemeItem(BaseModel):
     evidence: list[ThemeEvidenceReference] = Field(default_factory=list)
 
 
+PlaceForm = Literal["corridor", "area"]
+EncounterMode = Literal["along_corridor", "within_area"]
+EncounterAnchorKind = Literal["encounter", "segment", "center"]
+
+
+class EncounterAnchor(BaseModel):
+    label: str
+    coordinates: list[float] = Field(min_length=2, max_length=2)
+    kind: EncounterAnchorKind
+    is_primary: bool = False
+
+
+class ExtendedPlaceContext(BaseModel):
+    place_form: PlaceForm
+    encounter_mode: EncounterMode
+    display_hint: str | None = None
+    encounter_anchors: list[EncounterAnchor] = Field(default_factory=list)
+
+
 class RouteResult(BaseModel):
     poi_id: str
     name: str
@@ -146,6 +165,7 @@ class RouteResult(BaseModel):
     score_breakdown: dict[str, float] | None = None
     why_it_matters: list[str]
     badges: list[str]
+    extended_place: ExtendedPlaceContext | None = None
 
 
 class RouteSuggestResponse(BaseModel):
@@ -168,6 +188,7 @@ class NearbyResult(BaseModel):
     score_breakdown: dict[str, float] | None = None
     why_it_matters: list[str]
     badges: list[str]
+    extended_place: ExtendedPlaceContext | None = None
 
 
 class NearbySuggestResponse(BaseModel):
@@ -194,6 +215,7 @@ class POIDetailResponse(BaseModel):
     provenance: dict[str, Any]
     evidence: list[dict[str, Any]] = Field(default_factory=list)
     themes: list[POIThemeItem] = Field(default_factory=list)
+    extended_place: ExtendedPlaceContext | None = None
 
 
 class AdminPOIItem(BaseModel):

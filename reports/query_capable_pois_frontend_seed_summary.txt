@@ -1,0 +1,6 @@
+output=reports/query_capable_pois_frontend_seed.csv
+database_rows=515
+fixture_rows=5
+fixture_added=4
+fixture_skipped_overlap=1
+total_rows=519

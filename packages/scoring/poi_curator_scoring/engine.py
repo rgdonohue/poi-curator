@@ -84,6 +84,7 @@ def _to_route_result(
         score=round(score, 1),
         why_it_matters=list(dict.fromkeys(why_it_matters))[:3],
         badges=list(dict.fromkeys(badges)),
+        extended_place=fixture.extended_place,
     )
 
 
@@ -216,6 +217,7 @@ def _build_nearby_fixture_results(
                     )
                 )
             ),
+            extended_place=fixture.extended_place,
         )
         for score, fixture, distance_m, estimated_access_minutes in scored_results[:limit]
     ]
@@ -281,6 +283,7 @@ def get_poi_detail(poi_id: str) -> POIDetailResponse | None:
         provenance=fixture.provenance,
         evidence=[],
         themes=_build_fixture_theme_items(fixture.themes),
+        extended_place=fixture.extended_place,
     )
 
 

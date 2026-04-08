@@ -17,6 +17,8 @@ def test_fixture_nearby_history_prefers_primary_match_near_plaza() -> None:
     assert response.results
     assert response.results[0].name == "Acequia Madre"
     assert response.results[0].category_match_type == "primary"
+    assert response.results[0].extended_place is not None
+    assert response.results[0].extended_place.place_form == "corridor"
 
 
 def test_fixture_nearby_scenic_can_be_empty_for_tiny_radius() -> None:

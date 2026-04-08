@@ -1,0 +1,6 @@
+fixture_poi_id,fixture_name,fixture_city,fixture_osm_id,db_match_type,db_poi_id,db_name,db_primary_category
+poi-acequia-madre,Acequia Madre,santa-fe,way/acequia-madre,name_city,67f76e6a-b2a5-439a-93e3-b123055f6ef0,Acequia Madre,civic
+poi-santa-fe-plaza,Santa Fe Plaza,santa-fe,way/santa-fe-plaza,none,,,
+poi-canyon-road-corridor,Canyon Road Arts Corridor,santa-fe,way/canyon-road,none,,,
+poi-rail-yard,Santa Fe Rail Yard District,santa-fe,way/rail-yard,none,,,
+poi-cross-of-the-martyrs,Cross of the Martyrs Overlook,santa-fe,node/cross-martyrs,none,,,

@@ -4,6 +4,8 @@ Use this for a short product-legibility pass in `/map-test` while history scorin
 
 Goal: confirm that the map UI tells the right place-story for each case. Judge what the tester can see: result names, map placement, route relevance, and whether the list feels obviously on-topic.
 
+This pass is now explicitly geometry-aware. Do not only judge whether the returned place is thematically relevant. Also judge whether the visible pin placement feels like a believable encounter location for that place.
+
 ## Quick Pass
 
 - Open `/map-test`.
@@ -11,6 +13,16 @@ Goal: confirm that the map UI tells the right place-story for each case. Judge w
 - For nearby cases, judge the top 3 results first, then scan the rest.
 - For route cases, check both the list and whether result pins stay plausibly close to the drawn route.
 - Do not block on small ordering swaps when the visible story is still correct.
+
+## Geometry-Aware Checks
+
+Apply these checks during the pass, especially for corridor-like cases:
+
+- When the top result is corridor-like, ask whether the returned pin feels like a plausible encounter location rather than an abstract midpoint.
+- For `nearby-acequia-water`, rerun the query after moving the center slightly west, east, north, and south. The top pin should shift plausibly along or around the corridor rather than snapping back to a fixed abstract center.
+- For `route-acequia-water`, ask whether the returned pin sits near the relevant segment of the route rather than a remote part of the corridor.
+- For point-like building results, confirm they still behave like ordinary POIs: one stable point, no corridor-like drift, no odd area-style interpretation.
+- If a result feels thematically correct but spatially arbitrary, mark it `Suspicious` rather than `Pass`.
 
 ## Case 1: Nearby Plaza-Core History
 
@@ -119,6 +131,8 @@ Expected good behavior:
 - `Acequia Madre` is the clearest expected anchor.
 - `Acequia Trail Crossing` is also a valid water-linked result.
 - A short list, including a single strong result, is acceptable if it is obviously the right water story.
+- The returned pin for `Acequia Madre` should feel like a plausible encounter point on or near the acequia corridor.
+- Small nearby-center shifts should produce sensible pin shifts rather than a fixed midpoint feel.
 
 Acceptable behavior:
 
@@ -131,12 +145,74 @@ Suspicious but not blocking:
 - The list is very thin and the water story is only partly legible.
 - A generic civic item appears alongside `Acequia Madre`, but the water interpretation still dominates.
 - `Acequia Trail Crossing` appears without `Acequia Madre`, if the overall corridor still reads as water-linked.
+- `Acequia Madre` appears, but the pin still feels arbitrary or visually detached from how a traveler would encounter it.
+- The pin moves, but not in a way that tracks the nearby-center shift convincingly.
 
 Blocking behavior:
 
 - Water theme is not legible at all.
 - Plaza or broad downtown history anchors appear.
 - The result set reads as generic civic browsing rather than acequia-linked water traces.
+- The top acequia result is returned, but the pin clearly behaves like an implausible abstract center rather than a believable encounter point.
+
+## Case 5: Route Acequia Water
+
+Case id: `route-acequia-water`
+
+Setup: `Route` | load or draw a short west-to-east route along the acequia corridor | category `Mixed` | theme `Water` | travel mode `Walking` | max detour `600` | limit `5`
+
+Expected good behavior:
+
+- The list should read as acequia / water corridor relevance, not generic civic browsing.
+- `Acequia Madre` should be the clearest top-tier result.
+- The returned pin should sit near the route-relevant part of the corridor.
+- The route and the acequia result should tell one coherent local water story.
+
+Acceptable behavior:
+
+- `Acequia Madre` appears as the main result, even if the list is short.
+- `Acequia Trail Crossing` appears as a supporting result.
+- The acequia pin is close enough to the route that a user would read it as route-plausible.
+
+Suspicious but not blocking:
+
+- The result list is right, but the acequia pin looks a little detached from the relevant route segment.
+- A generic civic result appears below the water-linked result without dominating the story.
+- The route reading is mostly right, but the map behavior still feels a bit thin.
+
+Blocking behavior:
+
+- The route results read as generic civic or downtown browsing instead of water-linked corridor behavior.
+- `Acequia Madre` is missing with no equally legible water-linked substitute.
+- The acequia pin lands in a way that feels visibly disconnected from the relevant route segment.
+
+## Case 6: Negative Control for Ordinary Building-Like POIs
+
+Use this as a regression check after the main cases.
+
+Setup: run either `nearby-plaza-history` or `route-historic-center-driving`, then click one ordinary building-like result such as `De Vargas Street House`, `Gregorio Crespin House`, or `Kruger Building`.
+
+Expected good behavior:
+
+- The selected building still behaves like a normal point-like POI.
+- The pin feels stable and ordinary, not corridor-like or area-like.
+- Nothing about the result presentation suggests stretched geometry, corridor anchoring, or district-style behavior.
+
+Acceptable behavior:
+
+- Minor pin placement imprecision within the immediate building block.
+- Normal variation between nearby and route result emphasis.
+
+Suspicious but not blocking:
+
+- The building pin is plausible, but feels slightly offset in a way worth noting.
+- The surrounding list is correct, but one ordinary building result feels less point-like than expected.
+
+Blocking behavior:
+
+- An ordinary building-like result presents as though it were a corridor or area.
+- The pin placement visibly drifts or behaves inconsistently when nothing about the place suggests extended geometry.
+- The result behavior makes normal building-scale POIs feel less trustworthy.
 
 ## Severity Guide
 
@@ -145,3 +221,23 @@ Acceptable means the tester would still understand the intended story without ex
 Suspicious but not blocking means the visible story is mostly right, but ranking or framing feels soft enough that it should be noted for follow-up.
 
 Blocking means the visible story is wrong, off-topic, empty when it should not be, or disconnected enough from the map context that a user would lose trust.
+
+## Recording Template
+
+Record each case in a short grid so the pass does not turn into vague impressions.
+
+Suggested columns:
+
+- `case_id`
+- `status` (`Pass`, `Suspicious`, `Fail`)
+- `top_result`
+- `pin_behavior`
+- `notes`
+- `screenshot`
+
+Example:
+
+| case_id | status | top_result | pin_behavior | notes | screenshot |
+| --- | --- | --- | --- | --- | --- |
+| nearby-acequia-water | Pass | Acequia Madre | Pin shifts plausibly west/east along corridor | Tight list but coherent water story | `qa/nearby-acequia-water-pass.png` |
+| route-acequia-water | Suspicious | Acequia Madre | Route-adjacent, but pin feels slightly detached from best segment | Watch if Detour needs primary encounter hint | `qa/route-acequia-water-suspicious.png` |
