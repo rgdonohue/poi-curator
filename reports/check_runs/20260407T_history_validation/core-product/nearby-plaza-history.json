@@ -1,0 +1,209 @@
+{
+  "generated_at": "2026-04-08T03:27:50.386815Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 0,
+  "failed_count": 1,
+  "runs": [
+    {
+      "case_id": "nearby-plaza-history",
+      "label": "Plaza-Core History Nearby",
+      "mode": "nearby",
+      "purpose": "Protect historical anchors around the plaza core without turning nearby into generic downtown search.",
+      "category": "history",
+      "theme": null,
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": false,
+      "result_count": 5,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "history",
+        "theme": null,
+        "radius_meters": 800,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.687,
+          "lon": -105.9378
+        },
+        "travel_mode": "walking",
+        "category": "history",
+        "theme": null,
+        "radius_meters": 800,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Palace of the Governors"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Palace of the Governors",
+        "Museum of Contemporary Native Arts",
+        "The Palace Press",
+        "Soldiers' Monument",
+        "Loretto Chapel"
+      ],
+      "soft_warnings": [],
+      "notes": [
+        "Not enough preferred top names appeared in the returned top results (1/2)."
+      ],
+      "results": [
+        {
+          "name": "Palace of the Governors",
+          "score": 77.4,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Museum or interpretive site with clear historical context.",
+          "distance_label": "distance_from_center_m=131 access_min=2",
+          "score_breakdown": {
+            "point_proximity": 15.05,
+            "radius_fit": 10.04,
+            "significance": 21.3,
+            "quality": 9.0,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 6.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Museum of Contemporary Native Arts",
+          "score": 71.8,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Museum or interpretive site with clear historical context.",
+          "distance_label": "distance_from_center_m=84 access_min=1",
+          "score_breakdown": {
+            "point_proximity": 16.11,
+            "radius_fit": 10.74,
+            "significance": 20.4,
+            "quality": 8.5,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "The Palace Press",
+          "score": 71.5,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Museum or interpretive site with clear historical context.",
+          "distance_label": "distance_from_center_m=171 access_min=2",
+          "score_breakdown": {
+            "point_proximity": 14.15,
+            "radius_fit": 9.44,
+            "significance": 19.2,
+            "quality": 6.75,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 6.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Soldiers' Monument",
+          "score": 71.0,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Monument or memorial with strong public memory value.",
+          "distance_label": "distance_from_center_m=100 access_min=1",
+          "score_breakdown": {
+            "point_proximity": 15.75,
+            "radius_fit": 10.5,
+            "significance": 21.3,
+            "quality": 9.0,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Loretto Chapel",
+          "score": 69.1,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Museum or interpretive site with clear historical context.",
+          "distance_label": "distance_from_center_m=191 access_min=2",
+          "score_breakdown": {
+            "point_proximity": 13.7,
+            "radius_fit": 9.13,
+            "significance": 21.3,
+            "quality": 9.0,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

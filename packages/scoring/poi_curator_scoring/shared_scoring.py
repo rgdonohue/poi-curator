@@ -85,6 +85,7 @@ def compute_category_context_components(
     art_anchor_bonus = 0.0
     civic_anchor_bonus = 0.0
     civic_fragment_penalty = 0.0
+    history_anchor_bonus = 0.0
 
     if requested_category == "scenic":
         if poi.normalized_category != "scenic" and "scenic" in display_categories:
@@ -131,11 +132,15 @@ def compute_category_context_components(
         ):
             civic_fragment_penalty = -5.0
 
+    if requested_category == "history" and _is_history_anchor(poi):
+        history_anchor_bonus = 6.0
+
     return {
         "scenic_specificity": scenic_specificity,
         "art_anchor_bonus": art_anchor_bonus,
         "civic_anchor_bonus": civic_anchor_bonus,
         "civic_fragment_penalty": civic_fragment_penalty,
+        "history_anchor_bonus": history_anchor_bonus,
     }
 
 
@@ -334,6 +339,33 @@ def _is_rail_anchor(poi: POI) -> bool:
     if (
         "railyard" in name or "rail yard" in name
     ) and normalized_subcategory in {"historic_district", "infrastructure_landmark"}:
+        return True
+    return False
+
+
+def _is_history_anchor(poi: POI) -> bool:
+    raw_tags = dict(getattr(poi, "raw_tag_summary_json", {}) or {})
+    name = str(getattr(poi, "canonical_name", "") or "").casefold()
+    normalized_subcategory = str(getattr(poi, "normalized_subcategory", "") or "")
+    display_categories = list(getattr(poi, "display_categories", []) or [])
+
+    if (
+        "history" not in display_categories
+        and getattr(poi, "normalized_category", None) != "history"
+    ):
+        return False
+    if name in {
+        "palace of the governors",
+        "the santa fe plaza",
+        "santa fe plaza",
+        "de vargas street house",
+    }:
+        return True
+    if (
+        name == "san miguel"
+        and normalized_subcategory == "ritual_religious_site"
+        and raw_tags.get("historic") in {"building", "church"}
+    ):
         return True
     return False
 

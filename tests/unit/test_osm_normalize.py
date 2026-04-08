@@ -144,3 +144,24 @@ def test_waterway_trace_normalizes_to_civic_primary() -> None:
     assert normalized.normalized_subcategory == "infrastructure_landmark"
     assert normalized.display_categories == ["civic"]
     assert audit.matched_rule_id == "waterway_trace"
+
+
+def test_the_santa_fe_plaza_gets_history_secondary_override() -> None:
+    element = {
+        "type": "way",
+        "id": 10002,
+        "center": {"lat": 35.6870, "lon": -105.9378},
+        "tags": {
+            "name": "The Santa Fe Plaza",
+            "leisure": "park",
+        },
+    }
+
+    normalized, audit = normalize_osm_element_with_audit(element, get_region("santa-fe"))
+
+    assert normalized is not None
+    assert normalized.normalized_category == "civic"
+    assert normalized.normalized_subcategory == "civic_space_plaza"
+    assert normalized.display_categories == ["civic", "history"]
+    assert normalized.historical_flag is True
+    assert audit.matched_rule_id == "park_named_plaza"

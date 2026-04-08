@@ -177,6 +177,69 @@ def test_secondary_point_match_can_win_if_it_is_much_closer() -> None:
     assert secondary_score > primary_score
 
 
+def test_history_anchor_bonus_lifts_palace_above_generic_history_museum() -> None:
+    payload = make_payload(category="history").model_copy(update={"travel_mode": "walking"})
+    museum = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Museum of Contemporary Native Arts",
+            normalized_category="history",
+            normalized_subcategory="museum",
+            display_categories=["history"],
+            raw_tag_summary_json={
+                "name": "Museum of Contemporary Native Arts",
+                "tourism": "museum",
+            },
+            drive_affinity_hint=0.75,
+            walk_affinity_hint=0.75,
+            base_significance_score=68.0,
+            quality_score=85.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    palace = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Palace of the Governors",
+            normalized_category="history",
+            normalized_subcategory="museum",
+            display_categories=["history"],
+            raw_tag_summary_json={
+                "name": "Palace of the Governors",
+                "tourism": "museum",
+            },
+            drive_affinity_hint=0.75,
+            walk_affinity_hint=0.75,
+            base_significance_score=71.0,
+            quality_score=90.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    museum_metrics = PointCandidateMetrics(
+        distance_from_point_m=84,
+        estimated_access_m=84,
+        estimated_access_minutes=1,
+        proximity_score=16.11,
+        radius_fit_score=10.74,
+    )
+    palace_metrics = PointCandidateMetrics(
+        distance_from_point_m=131,
+        estimated_access_m=131,
+        estimated_access_minutes=2,
+        proximity_score=15.05,
+        radius_fit_score=10.04,
+    )
+
+    museum_score, museum_breakdown, _ = score_point_candidate(museum, payload, museum_metrics)
+    palace_score, palace_breakdown, _ = score_point_candidate(palace, payload, palace_metrics)
+
+    assert museum_breakdown["history_anchor_bonus"] == 0.0
+    assert palace_breakdown["history_anchor_bonus"] == 6.0
+    assert palace_score > museum_score
+
+
 def test_official_corroboration_contributes_to_point_score() -> None:
     payload = make_payload(category="history")
     poi = cast(

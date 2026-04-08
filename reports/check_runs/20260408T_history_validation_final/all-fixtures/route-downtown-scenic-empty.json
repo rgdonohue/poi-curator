@@ -1,0 +1,72 @@
+{
+  "generated_at": "2026-04-08T03:52:43.737283Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "route-downtown-scenic-empty",
+      "label": "Downtown Scenic Empty",
+      "mode": "route",
+      "purpose": "Protect honest empty behavior for downtown scenic route requests.",
+      "category": "scenic",
+      "theme": null,
+      "travel_mode": "driving",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 0,
+      "query_summary": {
+        "travel_mode": "driving",
+        "category": "scenic",
+        "theme": null,
+        "max_detour_meters": 400,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.9395,
+              35.6865
+            ],
+            [
+              -105.9365,
+              35.6885
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Plaza West",
+          "coordinates": [
+            -105.9395,
+            35.6865
+          ]
+        },
+        "destination": {
+          "name": "Plaza East",
+          "coordinates": [
+            -105.9365,
+            35.6885
+          ]
+        },
+        "travel_mode": "driving",
+        "category": "scenic",
+        "theme": null,
+        "max_detour_meters": 400,
+        "max_extra_minutes": 3,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [],
+      "violated_forbidden_names": [],
+      "top_result_names": [],
+      "soft_warnings": [],
+      "notes": [],
+      "results": []
+    }
+  ]
+}

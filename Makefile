@@ -1,7 +1,11 @@
+VENV := .venv
+PY   := $(VENV)/bin/python
+BIN  := $(VENV)/bin
+
 .PHONY: install db-up db-down migrate api test lint typecheck ingest-osm enrich eval-routes check-suites
 
 install:
-	python3 -m pip install -e ".[dev]"
+	$(PY) -m pip install -e ".[dev]"
 
 db-up:
 	docker compose up -d db
@@ -10,28 +14,28 @@ db-down:
 	docker compose down
 
 migrate:
-	alembic upgrade head
+	$(BIN)/alembic upgrade head
 
 api:
-	uvicorn poi_curator_api.main:app --reload --host 0.0.0.0 --port 8000
+	$(BIN)/uvicorn poi_curator_api.main:app --reload --host 0.0.0.0 --port 8000
 
 test:
-	pytest
+	$(BIN)/pytest
 
 lint:
-	ruff check .
+	$(BIN)/ruff check .
 
 typecheck:
-	mypy apps packages tests
+	$(BIN)/mypy apps packages tests
 
 ingest-osm:
-	poi-curator-ingest osm --region santa-fe
+	$(BIN)/poi-curator-ingest osm --region santa-fe
 
 enrich:
-	poi-curator-enrich wikidata --region santa-fe
+	$(BIN)/poi-curator-enrich wikidata --region santa-fe
 
 eval-routes:
-	poi-curator-eval routes --fixtures data/fixtures/routes_santa_fe.json
+	$(BIN)/poi-curator-eval routes --fixtures data/fixtures/routes_santa_fe.json
 
 check-suites:
-	python3 scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails
+	$(PY) scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails

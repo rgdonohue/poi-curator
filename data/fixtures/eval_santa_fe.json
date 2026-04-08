@@ -40,6 +40,7 @@
         ],
         "forbidden_names": ["Santa Fe Farmers Market"],
         "preferred_top_names": ["Palace of the Governors", "The Santa Fe Plaza"],
+        "required_preferred_top_names_count": 2,
         "min_results": 3
       }
     },
@@ -214,6 +215,7 @@
         "expected_any_names": ["De Vargas Street House", "San Miguel Chapel", "The Santa Fe Plaza"],
         "forbidden_names": ["Santa Fe Farmers Market"],
         "preferred_top_names": ["De Vargas Street House", "San Miguel Chapel"],
+        "required_preferred_top_names_count": 2,
         "min_results": 3
       }
     },

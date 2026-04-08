@@ -148,6 +148,65 @@ def test_evaluate_nearby_case_dispatches_and_flags_soft_preference() -> None:
     assert "None of the preferred top names appeared in the top 3 results." in result.soft_warnings
 
 
+def test_evaluate_case_can_require_multiple_preferred_top_names() -> None:
+    cases = load_evaluation_cases(Path("data/fixtures/eval_santa_fe.json"))
+    nearby_case = next(case for case in cases if case.id == "nearby-plaza-history")
+    response = NearbySuggestResponse(
+        query_summary=NearbyQuerySummary(
+            travel_mode="walking",
+            category="history",
+            radius_meters=800,
+            limit=5,
+        ),
+        results=[
+            NearbyResult(
+                poi_id="2",
+                name="Palace of the Governors",
+                primary_category="history",
+                secondary_categories=[],
+                category_match_type="primary",
+                coordinates=[-105.93, 35.68],
+                short_description="desc",
+                distance_from_center_meters=80,
+                estimated_access_m=80,
+                estimated_access_minutes=1,
+                score=79.0,
+                score_breakdown={"point_proximity": 16.0, "significance": 20.0},
+                why_it_matters=["good"],
+                badges=["history"],
+            ),
+            NearbyResult(
+                poi_id="3",
+                name="Museum of Contemporary Native Arts",
+                primary_category="history",
+                secondary_categories=[],
+                category_match_type="primary",
+                coordinates=[-105.93, 35.68],
+                short_description="desc",
+                distance_from_center_meters=120,
+                estimated_access_m=120,
+                estimated_access_minutes=2,
+                score=75.0,
+                score_breakdown={"point_proximity": 15.0, "significance": 19.0},
+                why_it_matters=["good"],
+                badges=["history"],
+            ),
+        ],
+    )
+
+    result = evaluate_case(
+        FakeBackend(nearby_response=response),
+        cast(Session, object()),
+        nearby_case,
+    )
+
+    assert result.passed is False
+    assert (
+        "Not enough preferred top names appeared in the returned top results (1/2)."
+        in result.notes
+    )
+
+
 def test_render_combined_markdown_report_contains_mode_and_purpose() -> None:
     cases = load_evaluation_cases(Path("data/fixtures/eval_santa_fe.json"))
     nearby_case = next(case for case in cases if case.id == "nearby-downtown-scenic-empty")

@@ -1,0 +1,48 @@
+{
+  "generated_at": "2026-04-08T03:36:30.530496Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "nearby-plaza-water-empty",
+      "label": "Plaza Water Nearby Empty",
+      "mode": "nearby",
+      "purpose": "Protect honest empty behavior when a tight plaza-core query asks specifically for the water theme.",
+      "category": "mixed",
+      "theme": "water",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 0,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "water",
+        "radius_meters": 250,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.687,
+          "lon": -105.9378
+        },
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "water",
+        "radius_meters": 250,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [],
+      "violated_forbidden_names": [],
+      "top_result_names": [],
+      "soft_warnings": [],
+      "notes": [],
+      "results": []
+    }
+  ]
+}

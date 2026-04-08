@@ -110,7 +110,10 @@ def normalize_osm_element_with_audit(
         if isinstance(centroid_geom, Point)
         else Point(centroid_geom.x, centroid_geom.y)
     )
-    display_categories = display_categories_for_classification(tags, classification)
+    display_categories = apply_name_specific_category_overrides(
+        canonical_name,
+        display_categories_for_classification(tags, classification),
+    )
 
     normalized = NormalizedPOI(
         source_record_id=source_record_id,
@@ -280,6 +283,22 @@ def display_categories_for_classification(
         if category in categories and category not in seen:
             result.append(category)
             seen.add(category)
+    return result
+
+
+def apply_name_specific_category_overrides(
+    canonical_name: str,
+    display_categories: list[str],
+) -> list[str]:
+    name = canonical_name.casefold()
+    if name not in {"the santa fe plaza", "santa fe plaza"}:
+        return display_categories
+    if "history" in display_categories:
+        return display_categories
+
+    result = list(display_categories)
+    insert_at = 1 if result else 0
+    result.insert(insert_at, "history")
     return result
 
 

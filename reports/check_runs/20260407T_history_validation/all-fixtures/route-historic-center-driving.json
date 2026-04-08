@@ -1,0 +1,233 @@
+{
+  "generated_at": "2026-04-08T03:27:50.568989Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 0,
+  "failed_count": 1,
+  "runs": [
+    {
+      "case_id": "route-historic-center-driving",
+      "label": "Historic Center Driving",
+      "mode": "route",
+      "purpose": "Protect the downtown history route where strong primary-history anchors should dominate.",
+      "category": "history",
+      "theme": null,
+      "travel_mode": "driving",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": false,
+      "result_count": 5,
+      "query_summary": {
+        "travel_mode": "driving",
+        "category": "history",
+        "theme": null,
+        "max_detour_meters": 1800,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.94,
+              35.681
+            ],
+            [
+              -105.933,
+              35.689
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Southwest",
+          "coordinates": [
+            -105.94,
+            35.681
+          ]
+        },
+        "destination": {
+          "name": "Northeast",
+          "coordinates": [
+            -105.933,
+            35.689
+          ]
+        },
+        "travel_mode": "driving",
+        "category": "history",
+        "theme": null,
+        "max_detour_meters": 1800,
+        "max_extra_minutes": 8,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "De Vargas Street House"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Digneo-Valdes House",
+        "De Vargas Street House",
+        "Gregorio Crespín House",
+        "Kruger Building",
+        "Tudesque House"
+      ],
+      "soft_warnings": [],
+      "notes": [
+        "Not enough preferred top names appeared in the returned top results (1/2)."
+      ],
+      "results": [
+        {
+          "name": "Digneo-Valdes House",
+          "score": 81.0,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=65 detour_m=130 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.32,
+            "detour_fit": 13.92,
+            "budget_fit": 4.51,
+            "significance": 22.5,
+            "quality": 8.5,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "De Vargas Street House",
+          "score": 80.1,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Museum or interpretive site with clear historical context.",
+          "distance_label": "distance_from_route_m=29 detour_m=58 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.7,
+            "detour_fit": 14.52,
+            "budget_fit": 4.61,
+            "significance": 21.3,
+            "quality": 9.0,
+            "mode_affinity": 6.0,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Gregorio Crespín House",
+          "score": 78.4,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=149 detour_m=298 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 13.45,
+            "detour_fit": 12.52,
+            "budget_fit": 4.27,
+            "significance": 22.5,
+            "quality": 8.5,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Kruger Building",
+          "score": 78.4,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=38 detour_m=76 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.6,
+            "detour_fit": 14.37,
+            "budget_fit": 4.58,
+            "significance": 20.4,
+            "quality": 7.25,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Tudesque House",
+          "score": 77.3,
+          "primary_category": "history",
+          "category_match_type": "primary",
+          "short_description": "Historic site with strong local landscape context.",
+          "distance_label": "distance_from_route_m=139 detour_m=278 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 13.55,
+            "detour_fit": 12.68,
+            "budget_fit": 4.3,
+            "significance": 21.6,
+            "quality": 8.0,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -0.0,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

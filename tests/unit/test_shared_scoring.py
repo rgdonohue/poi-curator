@@ -170,3 +170,66 @@ def test_compute_category_context_rewards_civic_hybrid_rail_depot() -> None:
     breakdown = compute_category_context_components(poi, requested_category="civic")
 
     assert breakdown["civic_anchor_bonus"] == 10.0
+
+
+def test_compute_category_context_rewards_targeted_history_anchors() -> None:
+    palace = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Palace of the Governors",
+            normalized_category="history",
+            normalized_subcategory="museum",
+            display_categories=["history"],
+            raw_tag_summary_json={"name": "Palace of the Governors", "tourism": "museum"},
+        ),
+    )
+    chapel = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="San Miguel",
+            normalized_category="culture",
+            normalized_subcategory="ritual_religious_site",
+            display_categories=["culture", "history"],
+            raw_tag_summary_json={
+                "name": "San Miguel",
+                "amenity": "place_of_worship",
+                "historic": "building",
+            },
+        ),
+    )
+    plaza = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="The Santa Fe Plaza",
+            normalized_category="civic",
+            normalized_subcategory="civic_space_plaza",
+            display_categories=["civic", "history"],
+            raw_tag_summary_json={"name": "The Santa Fe Plaza", "leisure": "park"},
+        ),
+    )
+    generic_museum = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="The Palace Press",
+            normalized_category="history",
+            normalized_subcategory="museum",
+            display_categories=["history"],
+            raw_tag_summary_json={
+                "name": "The Palace Press",
+                "tourism": "museum",
+            },
+        ),
+    )
+
+    palace_breakdown = compute_category_context_components(palace, requested_category="history")
+    chapel_breakdown = compute_category_context_components(chapel, requested_category="history")
+    plaza_breakdown = compute_category_context_components(plaza, requested_category="history")
+    museum_breakdown = compute_category_context_components(
+        generic_museum,
+        requested_category="history",
+    )
+
+    assert palace_breakdown["history_anchor_bonus"] == 6.0
+    assert chapel_breakdown["history_anchor_bonus"] == 6.0
+    assert plaza_breakdown["history_anchor_bonus"] == 6.0
+    assert museum_breakdown["history_anchor_bonus"] == 0.0

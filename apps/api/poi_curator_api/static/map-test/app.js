@@ -5,8 +5,8 @@ const EMPTY_COLLECTION = { type: "FeatureCollection", features: [] };
 
 const LOCATION_PRESETS = [
   { name: "Plaza", coordinates: [-105.9378, 35.687] },
-  { name: "Railyard", coordinates: [-105.9521, 35.6815] },
-  { name: "Canyon Road", coordinates: [-105.9169, 35.6848] },
+  { name: "Railyard", coordinates: [-105.9504, 35.6801] },
+  { name: "Canyon Road", coordinates: [-105.9205, 35.6796] },
   { name: "Acequia Corridor", coordinates: [-105.9334, 35.6829] },
 ];
 
@@ -30,9 +30,9 @@ const ROUTE_SAMPLES = [
   {
     name: "Canyon Road",
     coordinates: [
-      [-105.919, 35.6838],
-      [-105.9173, 35.6845],
-      [-105.9155, 35.6852],
+      [-105.9234, 35.6793],
+      [-105.9205, 35.6796],
+      [-105.9176, 35.6799],
     ],
   },
   {

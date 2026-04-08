@@ -230,6 +230,115 @@ def test_secondary_match_can_win_with_large_route_advantage() -> None:
     assert secondary_score > primary_score
 
 
+def test_san_miguel_is_primary_equivalent_for_history_route_scoring() -> None:
+    payload = make_payload(category="history")
+    poi = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="San Miguel",
+            normalized_category="culture",
+            normalized_subcategory="ritual_religious_site",
+            display_categories=["culture", "history"],
+            raw_tag_summary_json={"historic": "building"},
+            drive_affinity_hint=0.6,
+            walk_affinity_hint=0.5,
+            base_significance_score=58.0,
+            quality_score=65.0,
+            editorial=SimpleNamespace(
+                editorial_title_override="San Miguel Chapel",
+                editorial_boost=0,
+            ),
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    metrics = CandidateMetrics(
+        distance_from_route_m=26,
+        estimated_detour_m=52,
+        estimated_extra_minutes=1,
+        proximity_score=14.73,
+        detour_score=14.57,
+        budget_score=4.62,
+    )
+
+    score, breakdown, match_type = score_candidate(poi, payload, metrics)
+
+    assert score > 0
+    assert match_type == "primary"
+    assert breakdown["category_bonus"] == 10.0
+    assert breakdown["category_intent_guardrail"] == 0.0
+
+
+def test_history_anchor_bonus_lifts_de_vargas_over_generic_house_inventory() -> None:
+    payload = make_payload(category="history")
+    inventory_house = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="Digneo-Valdes House",
+            normalized_category="history",
+            normalized_subcategory="historic_site",
+            display_categories=["history"],
+            raw_tag_summary_json={"name": "Digneo-Valdes House", "historic": "yes"},
+            drive_affinity_hint=0.9,
+            walk_affinity_hint=0.5,
+            base_significance_score=75.0,
+            quality_score=85.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    de_vargas = cast(
+        Any,
+        SimpleNamespace(
+            canonical_name="De Vargas Street House",
+            normalized_category="history",
+            normalized_subcategory="historic_site",
+            display_categories=["history"],
+            raw_tag_summary_json={
+                "name": "De Vargas Street House",
+                "historic": "yes",
+                "tourism": "attraction",
+            },
+            drive_affinity_hint=0.75,
+            walk_affinity_hint=0.5,
+            base_significance_score=71.0,
+            quality_score=90.0,
+            editorial=None,
+            signals=SimpleNamespace(genericity_penalty=0.0),
+        ),
+    )
+    inventory_metrics = CandidateMetrics(
+        distance_from_route_m=65,
+        estimated_detour_m=130,
+        estimated_extra_minutes=1,
+        proximity_score=14.32,
+        detour_score=13.92,
+        budget_score=4.51,
+    )
+    de_vargas_metrics = CandidateMetrics(
+        distance_from_route_m=29,
+        estimated_detour_m=58,
+        estimated_extra_minutes=1,
+        proximity_score=14.7,
+        detour_score=14.52,
+        budget_score=4.61,
+    )
+
+    inventory_score, inventory_breakdown, _ = score_candidate(
+        inventory_house,
+        payload,
+        inventory_metrics,
+    )
+    de_vargas_score, de_vargas_breakdown, _ = score_candidate(
+        de_vargas,
+        payload,
+        de_vargas_metrics,
+    )
+
+    assert inventory_breakdown["history_anchor_bonus"] == 0.0
+    assert de_vargas_breakdown["history_anchor_bonus"] == 6.0
+    assert de_vargas_score > inventory_score
+
+
 def test_official_corroboration_contributes_to_route_score() -> None:
     payload = make_payload(category="history")
     poi = cast(
@@ -349,7 +458,9 @@ def test_category_matches_filters_generic_scenic_parks_for_scenic_requests() -> 
 
 
 def test_mixed_rail_route_prefers_depot_anchor_over_rule_only_trace() -> None:
-    payload = make_payload(category="mixed").model_copy(update={"theme": "rail", "travel_mode": "walking"})
+    payload = make_payload(category="mixed").model_copy(
+        update={"theme": "rail", "travel_mode": "walking"}
+    )
     depot = cast(
         Any,
         SimpleNamespace(
@@ -367,7 +478,12 @@ def test_mixed_rail_route_prefers_depot_anchor_over_rule_only_trace() -> None:
             quality_score=85.0,
             editorial=None,
             signals=SimpleNamespace(genericity_penalty=0.0),
-            theme_memberships=[make_rail_membership(assignment_basis="mixed", evidence_links=[object()])],
+            theme_memberships=[
+                make_rail_membership(
+                    assignment_basis="mixed",
+                    evidence_links=[object()],
+                )
+            ],
         ),
     )
     trace = cast(

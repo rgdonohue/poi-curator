@@ -1,0 +1,83 @@
+{
+  "generated_at": "2026-04-08T03:36:30.529597Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "nearby-canyon-art",
+      "label": "Canyon Road Art Nearby",
+      "mode": "nearby",
+      "purpose": "Protect art-oriented nearby behavior around Canyon Road.",
+      "category": "art",
+      "theme": null,
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 1,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "art",
+        "theme": null,
+        "radius_meters": 700,
+        "limit": 5
+      },
+      "request_payload": {
+        "center": {
+          "lat": 35.6845,
+          "lon": -105.9175
+        },
+        "travel_mode": "walking",
+        "category": "art",
+        "theme": null,
+        "radius_meters": 700,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Convergence Gallery"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Convergence Gallery"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Convergence Gallery",
+          "score": 44.7,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_center_m=696 access_min=9",
+          "score_breakdown": {
+            "point_proximity": 0.1,
+            "radius_fit": 0.07,
+            "significance": 16.8,
+            "quality": 8.0,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "nearby_rail_anchor_prominence": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

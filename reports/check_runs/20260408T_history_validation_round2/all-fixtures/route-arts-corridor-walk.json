@@ -1,0 +1,233 @@
+{
+  "generated_at": "2026-04-08T03:36:30.532460Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "route-arts-corridor-walk",
+      "label": "Arts Corridor Walk",
+      "mode": "route",
+      "purpose": "Protect art-oriented route behavior near Canyon Road.",
+      "category": "art",
+      "theme": null,
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 5,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "art",
+        "theme": null,
+        "max_detour_meters": 500,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.924,
+              35.68
+            ],
+            [
+              -105.9185,
+              35.6795
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Canyon West",
+          "coordinates": [
+            -105.924,
+            35.68
+          ]
+        },
+        "destination": {
+          "name": "Canyon East",
+          "coordinates": [
+            -105.9185,
+            35.6795
+          ]
+        },
+        "travel_mode": "walking",
+        "category": "art",
+        "theme": null,
+        "max_detour_meters": 500,
+        "max_extra_minutes": 8,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Convergence Gallery",
+        "3 Studios Gallery",
+        "Ronnie Layden Fine Art"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Convergence Gallery",
+        "Red Dot Gallery",
+        "Ronnie Layden Fine Art",
+        "Luca Decor Contemporary Art",
+        "3 Studios Gallery"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Convergence Gallery",
+          "score": 79.2,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_route_m=0 detour_m=0 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 15.0,
+            "detour_fit": 15.0,
+            "budget_fit": 4.69,
+            "significance": 16.8,
+            "quality": 8.0,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Red Dot Gallery",
+          "score": 78.2,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_route_m=9 detour_m=18 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.66,
+            "detour_fit": 14.46,
+            "budget_fit": 4.6,
+            "significance": 16.8,
+            "quality": 8.0,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Ronnie Layden Fine Art",
+          "score": 77.4,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_route_m=12 detour_m=24 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.55,
+            "detour_fit": 14.28,
+            "budget_fit": 4.57,
+            "significance": 16.8,
+            "quality": 7.5,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "Luca Decor Contemporary Art",
+          "score": 77.3,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_route_m=15 detour_m=30 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.44,
+            "detour_fit": 14.1,
+            "budget_fit": 4.54,
+            "significance": 16.8,
+            "quality": 7.75,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        },
+        {
+          "name": "3 Studios Gallery",
+          "score": 76.2,
+          "primary_category": "art",
+          "category_match_type": "primary",
+          "short_description": "Art space with strong corridor-level cultural identity.",
+          "distance_label": "distance_from_route_m=23 detour_m=46 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.14,
+            "detour_fit": 13.62,
+            "budget_fit": 4.46,
+            "significance": 16.8,
+            "quality": 7.5,
+            "mode_affinity": 7.2,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 4.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 10.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

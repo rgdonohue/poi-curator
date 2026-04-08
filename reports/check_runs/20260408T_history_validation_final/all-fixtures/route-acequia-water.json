@@ -1,0 +1,107 @@
+{
+  "generated_at": "2026-04-08T03:52:43.735770Z",
+  "fixtures_path": "data/fixtures/eval_santa_fe.json",
+  "run_count": 1,
+  "passed_count": 1,
+  "failed_count": 0,
+  "runs": [
+    {
+      "case_id": "route-acequia-water",
+      "label": "Acequia Water Route",
+      "mode": "route",
+      "purpose": "Prove that the water theme can pull route-plausible acequia and water-linked traces without turning into generic civic search.",
+      "category": "mixed",
+      "theme": "water",
+      "travel_mode": "walking",
+      "region_hint": "santa-fe",
+      "limit": 5,
+      "expectation_based": true,
+      "passed": true,
+      "result_count": 1,
+      "query_summary": {
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "water",
+        "max_detour_meters": 600,
+        "limit": 5
+      },
+      "request_payload": {
+        "route_geometry": {
+          "type": "LineString",
+          "coordinates": [
+            [
+              -105.9345,
+              35.6804
+            ],
+            [
+              -105.9255,
+              35.6804
+            ]
+          ]
+        },
+        "origin": {
+          "name": "Acequia West",
+          "coordinates": [
+            -105.9345,
+            35.6804
+          ]
+        },
+        "destination": {
+          "name": "Acequia East",
+          "coordinates": [
+            -105.9255,
+            35.6804
+          ]
+        },
+        "travel_mode": "walking",
+        "category": "mixed",
+        "theme": "water",
+        "max_detour_meters": 600,
+        "max_extra_minutes": 10,
+        "region_hint": "santa-fe",
+        "limit": 5
+      },
+      "matched_expected_names": [
+        "Acequia Madre"
+      ],
+      "violated_forbidden_names": [],
+      "top_result_names": [
+        "Acequia Madre"
+      ],
+      "soft_warnings": [],
+      "notes": [],
+      "results": [
+        {
+          "name": "Acequia Madre",
+          "score": 62.8,
+          "primary_category": "civic",
+          "category_match_type": "mixed",
+          "short_description": "Infrastructure trace that reveals labor, circulation, or water systems.",
+          "distance_label": "distance_from_route_m=1 detour_m=2 extra_min=1",
+          "score_breakdown": {
+            "route_proximity": 14.97,
+            "detour_fit": 14.95,
+            "budget_fit": 4.74,
+            "significance": 19.2,
+            "quality": 6.0,
+            "mode_affinity": 4.4,
+            "official_corroboration": 0.0,
+            "district_membership": 0.0,
+            "institutional_identity": 0.0,
+            "editorial_boost": 0.0,
+            "penalties": -1.5,
+            "scenic_specificity": 0.0,
+            "art_anchor_bonus": 0.0,
+            "civic_anchor_bonus": 0.0,
+            "civic_fragment_penalty": 0.0,
+            "history_anchor_bonus": 0.0,
+            "rail_anchor_bonus": 0.0,
+            "rail_trace_guardrail": 0.0,
+            "category_bonus": 0.0,
+            "category_intent_guardrail": 0.0
+          }
+        }
+      ]
+    }
+  ]
+}

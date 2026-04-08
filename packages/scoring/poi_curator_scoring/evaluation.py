@@ -24,6 +24,7 @@ class EvaluationExpectations(BaseModel):
     expected_any_names: list[str] = Field(default_factory=list)
     forbidden_names: list[str] = Field(default_factory=list)
     preferred_top_names: list[str] = Field(default_factory=list)
+    required_preferred_top_names_count: int | None = Field(default=None, ge=1)
     min_results: int | None = Field(default=None, ge=0)
     max_results: int | None = Field(default=None, ge=0)
 
@@ -410,6 +411,13 @@ def _evaluate_hard_expectations(
         notes.append(
             f"Expected at most {expectations.max_results} results but got {result_count}."
         )
+    if expectations.required_preferred_top_names_count is not None:
+        preferred_matches = sum(1 for name in expectations.preferred_top_names if name in names)
+        if preferred_matches < expectations.required_preferred_top_names_count:
+            notes.append(
+                "Not enough preferred top names appeared in the returned top results "
+                f"({preferred_matches}/{expectations.required_preferred_top_names_count})."
+            )
     return notes
 
 
