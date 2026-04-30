@@ -1,7 +1,8 @@
 from datetime import datetime
+from math import isfinite
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 from poi_curator_domain.themes import ThemeEditorialDecision, ThemeSlug, is_query_theme_active
 
@@ -10,15 +11,50 @@ class GeoLineString(BaseModel):
     type: Literal["LineString"] = "LineString"
     coordinates: list[list[float]] = Field(min_length=2)
 
+    @field_validator("coordinates")
+    @classmethod
+    def validate_coordinates(cls, value: list[list[float]]) -> list[list[float]]:
+        if len(value) < 2:
+            raise ValueError("LineString must contain at least 2 coordinate pairs.")
+        for index, coordinate in enumerate(value):
+            validate_lon_lat_coordinate(coordinate, label=f"route coordinate {index}")
+        return value
+
 
 class NamedPoint(BaseModel):
     name: str
     coordinates: list[float] = Field(min_length=2, max_length=2)
 
+    @field_validator("coordinates")
+    @classmethod
+    def validate_coordinates(cls, value: list[float]) -> list[float]:
+        validate_lon_lat_coordinate(value, label="point coordinates")
+        return value
+
 
 class LatLonPoint(BaseModel):
     lat: float
     lon: float
+
+    @model_validator(mode="after")
+    def validate_lat_lon(self) -> "LatLonPoint":
+        validate_lon_lat_values(self.lon, self.lat, label="center point")
+        return self
+
+
+def validate_lon_lat_coordinate(coordinate: list[float], *, label: str) -> None:
+    if len(coordinate) != 2:
+        raise ValueError(f"{label} must contain exactly [longitude, latitude].")
+    validate_lon_lat_values(coordinate[0], coordinate[1], label=label)
+
+
+def validate_lon_lat_values(lon: float, lat: float, *, label: str) -> None:
+    if not isfinite(lon) or not isfinite(lat):
+        raise ValueError(f"{label} must contain finite longitude and latitude values.")
+    if lon < -180 or lon > 180:
+        raise ValueError(f"{label} longitude must be between -180 and 180.")
+    if lat < -90 or lat > 90:
+        raise ValueError(f"{label} latitude must be between -90 and 90.")
 
 
 TravelMode = Literal["driving", "walking"]

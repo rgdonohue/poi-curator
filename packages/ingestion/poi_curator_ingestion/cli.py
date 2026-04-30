@@ -42,6 +42,11 @@ YES_OPTION = typer.Option(
     "--yes",
     help="Confirm destructive region reset before rebuilding live OSM data.",
 )
+NO_DEACTIVATE_STALE_OPTION = typer.Option(
+    False,
+    "--no-deactivate-stale",
+    help="Skip stale OSM canonical deactivation for intentionally partial ingest batches.",
+)
 
 
 @app.command("osm")
@@ -49,6 +54,7 @@ def ingest_osm(
     region: str = REGION_OPTION,
     input_file: Path | None = INPUT_FILE_OPTION,
     audit_output: Path | None = AUDIT_OUTPUT_OPTION,
+    no_deactivate_stale: bool = NO_DEACTIVATE_STALE_OPTION,
 ) -> None:
     region_spec = get_region(region)
     elements = (
@@ -61,7 +67,12 @@ def ingest_osm(
 
     session_factory = get_session_factory()
     with session_factory() as session:
-        summary = ingest_osm_elements(session, region_spec, elements)
+        summary = ingest_osm_elements(
+            session,
+            region_spec,
+            elements,
+            deactivate_stale=not no_deactivate_stale,
+        )
 
     typer.echo(
         "\n".join(
@@ -73,6 +84,7 @@ def ingest_osm(
                 f"canonical_inserted={summary.canonical_inserted}",
                 f"canonical_updated={summary.canonical_updated}",
                 f"skipped={summary.skipped_without_name_or_type}",
+                f"stale_deactivated={summary.stale_deactivated}",
                 f"ingest_run_id={summary.ingest_run_id}",
             ]
         )
@@ -103,6 +115,7 @@ def rebuild_osm(
     input_file: Path | None = INPUT_FILE_OPTION,
     audit_output: Path | None = AUDIT_OUTPUT_OPTION,
     yes: bool = YES_OPTION,
+    no_deactivate_stale: bool = NO_DEACTIVATE_STALE_OPTION,
 ) -> None:
     if not yes:
         raise typer.BadParameter("Pass --yes to confirm region-scoped OSM rebuild.")
@@ -127,6 +140,7 @@ def rebuild_osm(
         region=region,
         input_file=input_file,
         audit_output=audit_output,
+        no_deactivate_stale=no_deactivate_stale,
     )
 
 

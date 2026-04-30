@@ -1,7 +1,7 @@
 """Add theme editorial review metadata and allow reviewed-without-override rows."""
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 
 revision = "20260406_0008"
 down_revision = "20260406_0007"

@@ -1,9 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
-from shapely.geometry import LineString, Point, Polygon
-
 from poi_curator_scoring.place_representation import build_place_representation
+from shapely.geometry import LineString, Point, Polygon
 
 
 def test_line_geometry_builds_corridor_representation_from_query_encounter() -> None:
@@ -27,7 +26,10 @@ def test_line_geometry_builds_corridor_representation_from_query_encounter() -> 
     assert representation.extended_place.encounter_anchors[0].coordinates == pytest.approx(
         [2.0, 0.0]
     )
-    assert any(anchor.kind == "segment" for anchor in representation.extended_place.encounter_anchors[1:])
+    assert any(
+        anchor.kind == "segment"
+        for anchor in representation.extended_place.encounter_anchors[1:]
+    )
 
 
 def test_polygon_geometry_builds_area_representation_with_center_anchor() -> None:

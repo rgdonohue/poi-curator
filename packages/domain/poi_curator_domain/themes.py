@@ -1,6 +1,5 @@
 from dataclasses import dataclass
-from typing import Literal
-
+from typing import Literal, cast
 
 ThemeSlug = Literal["water", "rail", "public_memory"]
 ThemeStatus = Literal["candidate", "accepted", "suppressed"]
@@ -51,35 +50,41 @@ THEME_DEFINITION_SPECS: tuple[ThemeDefinitionSpec, ...] = (
 )
 
 
-THEME_LABELS: dict[ThemeSlug, str] = {
+THEME_LABELS: dict[str, str] = {
     spec.theme_slug: spec.label for spec in THEME_DEFINITION_SPECS
 }
-THEME_EXPLANATION_REASONS: dict[ThemeSlug, str] = {
+THEME_EXPLANATION_REASONS: dict[str, str] = {
     "water": "reveals acequia or water corridor traces",
     "rail": "reveals rail infrastructure or railyard corridor traces",
     "public_memory": "reveals civic commemoration or staged public memory",
 }
-THEME_BADGE_LABELS: dict[ThemeSlug, str] = {
+THEME_BADGE_LABELS: dict[str, str] = {
     "water": "water theme",
     "rail": "rail theme",
     "public_memory": "public memory theme",
 }
-QUERY_ACTIVE_THEME_SLUGS: frozenset[ThemeSlug] = frozenset(
+QUERY_ACTIVE_THEME_SLUGS: frozenset[str] = frozenset(
     spec.theme_slug for spec in THEME_DEFINITION_SPECS if spec.is_query_active
 )
 
 
-def is_query_theme_active(theme_slug: ThemeSlug) -> bool:
+def as_theme_slug(theme_slug: str | None) -> ThemeSlug | None:
+    if theme_slug is None or theme_slug not in THEME_LABELS:
+        return None
+    return cast(ThemeSlug, theme_slug)
+
+
+def is_query_theme_active(theme_slug: str) -> bool:
     return theme_slug in QUERY_ACTIVE_THEME_SLUGS
 
 
-def theme_explanation_reason(theme_slug: ThemeSlug | None) -> str | None:
+def theme_explanation_reason(theme_slug: str | None) -> str | None:
     if theme_slug is None:
         return None
     return THEME_EXPLANATION_REASONS.get(theme_slug)
 
 
-def theme_badge_label(theme_slug: ThemeSlug | None) -> str | None:
+def theme_badge_label(theme_slug: str | None) -> str | None:
     if theme_slug is None:
         return None
     return THEME_BADGE_LABELS.get(theme_slug)

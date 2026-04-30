@@ -1,5 +1,7 @@
 import logging
+from collections.abc import Sequence
 from datetime import UTC, datetime
+from typing import cast as type_cast
 
 from geoalchemy2 import Geometry
 from geoalchemy2.shape import to_shape
@@ -8,7 +10,6 @@ from poi_curator_domain.db import (
     OfficialMatchDiagnostic,
     POIEditorial,
     POIEvidence,
-    POIThemeEditorial,
     POIThemeMembership,
 )
 from poi_curator_domain.descriptions import choose_short_description_for_poi
@@ -26,14 +27,13 @@ from poi_curator_domain.schemas import (
     AdminThemeEffectiveOutcome,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
-    AdminThemeReviewResponse,
     AdminThemeSummaryItem,
     NearbyQuerySummary,
     NearbyResult,
     NearbySuggestRequest,
     NearbySuggestResponse,
-    POIThemeItem,
     POIDetailResponse,
+    POIThemeItem,
     QuerySummary,
     RouteResult,
     RouteSuggestRequest,
@@ -49,7 +49,12 @@ from poi_curator_domain.theme_service import (
     sync_theme_memberships,
     theme_review_state,
 )
-from poi_curator_domain.themes import THEME_LABELS, is_query_theme_active
+from poi_curator_domain.themes import (
+    THEME_LABELS,
+    ThemeEditorialDecision,
+    ThemeSlug,
+    is_query_theme_active,
+)
 from shapely.geometry import Point
 from sqlalchemy import cast, func, select
 from sqlalchemy.orm import Session, joinedload
@@ -61,7 +66,6 @@ from poi_curator_scoring.db_point_scoring import (
     is_within_radius,
     score_point_candidate,
 )
-from poi_curator_scoring.place_representation import build_place_representation
 from poi_curator_scoring.db_route_scoring import (
     build_route_line,
     build_route_result,
@@ -70,6 +74,7 @@ from poi_curator_scoring.db_route_scoring import (
     is_within_budget,
     score_candidate,
 )
+from poi_curator_scoring.place_representation import build_place_representation
 from poi_curator_scoring.shared_scoring import build_badges, build_why_it_matters
 
 logger = logging.getLogger(__name__)
@@ -94,7 +99,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
     candidate_query = candidate_query.where(
         POI.is_active.is_(True),
         _route_prefilter_clause(route_line.wkt, payload.max_detour_meters),
-    )
+    ).order_by(POI.poi_id)
     pois = db.execute(candidate_query).unique().scalars().all()
     if payload.theme is not None:
         _ensure_theme_memberships(db, pois)
@@ -120,7 +125,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
             results=[],
         )
 
-    scored_results: list[tuple[float, RouteResult]] = []
+    scored_results: list[tuple[float, str, RouteResult]] = []
     for poi in pois:
         if not category_matches(payload, poi):
             continue
@@ -143,6 +148,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
         scored_results.append(
             (
                 score,
+                poi.poi_id,
                 build_route_result(
                     poi,
                     representation.anchor_point,
@@ -156,7 +162,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
             )
         )
 
-    scored_results.sort(key=lambda item: item[0], reverse=True)
+    scored_results.sort(key=lambda item: (-item[0], item[1]))
     response = RouteSuggestResponse(
         query_summary=QuerySummary(
             travel_mode=payload.travel_mode,
@@ -165,7 +171,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
             max_detour_meters=payload.max_detour_meters,
             limit=payload.limit,
         ),
-        results=[result for _, result in scored_results[: payload.limit]],
+        results=[result for _, _, result in scored_results[: payload.limit]],
     )
     log_event(
         logger,
@@ -198,7 +204,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
     candidate_query = candidate_query.where(
         POI.is_active.is_(True),
         _nearby_prefilter_clause(payload.center.lon, payload.center.lat, payload.radius_meters),
-    )
+    ).order_by(POI.poi_id)
     pois = db.execute(candidate_query).unique().scalars().all()
     if payload.theme is not None:
         _ensure_theme_memberships(db, pois)
@@ -225,7 +231,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         )
 
     query_point = Point(payload.center.lon, payload.center.lat)
-    scored_results: list[tuple[float, NearbyResult]] = []
+    scored_results: list[tuple[float, str, NearbyResult]] = []
     for poi in pois:
         if not category_matches(payload, poi):
             continue
@@ -248,6 +254,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
         scored_results.append(
             (
                 score,
+                poi.poi_id,
                 build_nearby_result(
                     poi,
                     representation.anchor_point,
@@ -262,7 +269,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
             )
         )
 
-    scored_results.sort(key=lambda item: item[0], reverse=True)
+    scored_results.sort(key=lambda item: (-item[0], item[1]))
     response = NearbySuggestResponse(
         query_summary=NearbyQuerySummary(
             travel_mode=payload.travel_mode,
@@ -271,7 +278,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
             radius_meters=payload.radius_meters,
             limit=payload.limit,
         ),
-        results=[result for _, result in scored_results[: payload.limit]],
+        results=[result for _, _, result in scored_results[: payload.limit]],
     )
     log_event(
         logger,
@@ -476,7 +483,7 @@ def get_admin_theme_summaries(
 
     return [
         AdminThemeSummaryItem(
-            theme_slug=theme_slug,
+            theme_slug=type_cast(ThemeSlug, theme_slug),
             label=THEME_LABELS[theme_slug],
             is_query_active=is_query_theme_active(theme_slug),
             automated_accepted_count=counts["automated_accepted_count"],
@@ -757,10 +764,10 @@ def _route_prefilter_clause(route_wkt: str, max_detour_meters: int) -> ColumnEle
     )
 
 
-def _ensure_theme_memberships(db: Session, pois: list[POI]) -> None:
+def _ensure_theme_memberships(db: Session, pois: Sequence[POI]) -> None:
     if not pois:
         return
-    if sync_theme_memberships(db, pois):
+    if sync_theme_memberships(db, list(pois)):
         db.commit()
 
 
@@ -780,7 +787,8 @@ def _poi_matches_theme(poi: POI, theme: str | None) -> bool:
 def _build_theme_items(poi: POI) -> list[POIThemeItem]:
     evidence_by_id = {item.id: item for item in getattr(poi, "evidence_items", []) or []}
     editorial_by_slug = {
-        str(editorial.theme_slug): editorial for editorial in getattr(poi, "theme_editorials", []) or []
+        str(editorial.theme_slug): editorial
+        for editorial in getattr(poi, "theme_editorials", []) or []
     }
     items: list[POIThemeItem] = []
     resolved_memberships = resolve_effective_theme_memberships(poi)
@@ -823,7 +831,7 @@ def _load_admin_theme_pois(
         query = query.where(POI.city == city)
     pois = db.execute(query.order_by(POI.updated_at.desc())).unique().scalars().all()
     _ensure_theme_memberships(db, pois)
-    return pois
+    return list(pois)
 
 
 def _build_admin_theme_membership_detail(
@@ -849,7 +857,10 @@ def _build_admin_theme_membership_detail(
     editorial_record = None
     if editorial is not None:
         editorial_record = AdminThemeEditorialRecord(
-            editorial_decision=editorial.editorial_decision,
+            editorial_decision=type_cast(
+                ThemeEditorialDecision | None,
+                editorial.editorial_decision,
+            ),
             notes=editorial.notes,
             reviewed_by=editorial.reviewed_by,
             reviewed_at=editorial.reviewed_at,
@@ -870,7 +881,7 @@ def _build_admin_theme_membership_detail(
         poi_name=poi.canonical_name,
         city=poi.city,
         primary_category=poi.normalized_category,
-        theme_slug=theme_slug,
+        theme_slug=type_cast(ThemeSlug, theme_slug),
         theme_label=THEME_LABELS.get(theme_slug, theme_slug),
         is_query_active=is_query_theme_active(theme_slug),
         automated_membership=automated_membership,
@@ -907,5 +918,7 @@ def _review_state_priority(review_state: str) -> int:
 
 
 def _automated_status_priority(status: str | None) -> int:
+    if status is None:
+        return 2
     priorities = {"candidate": 0, "accepted": 1}
     return priorities.get(status, 2)

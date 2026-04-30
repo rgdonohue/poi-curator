@@ -1,6 +1,6 @@
 import logging
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from poi_curator_domain.db import (
     POI,
@@ -25,6 +25,7 @@ from poi_curator_domain.theme_service import (
     get_theme_membership_by_slug,
     sync_theme_memberships,
 )
+from poi_curator_domain.themes import ThemeSlug
 from poi_curator_enrichment.pipeline import (
     build_nrhp_evidence,
     build_state_register_evidence,
@@ -260,7 +261,7 @@ def review_theme_membership(
         raise ValueError("Theme review was saved, but the detail view could not be rebuilt.")
     return AdminThemeReviewResponse(
         poi_id=poi.poi_id,
-        theme_slug=theme_slug,
+        theme_slug=cast(ThemeSlug, theme_slug),
         reviewed=True,
         detail=detail,
     )

@@ -134,7 +134,8 @@ def upgrade() -> None:
                 "theme_slug": "rail",
                 "label": "Rail",
                 "description": (
-                    "Places that reveal rail infrastructure, labor, circulation, and adaptive reuse."
+                    "Places that reveal rail infrastructure, labor, circulation, "
+                    "and adaptive reuse."
                 ),
                 "region_scope": "santa-fe",
                 "is_active": True,

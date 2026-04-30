@@ -5,9 +5,9 @@ from typing import Any, cast
 from poi_curator_domain.theme_service import (
     evaluate_rail_theme,
     evaluate_theme_memberships,
+    evaluate_water_theme,
     get_theme_editorial_by_slug,
     get_theme_membership_by_slug,
-    evaluate_water_theme,
     resolve_effective_theme_membership,
     theme_review_state,
 )
@@ -143,14 +143,19 @@ def test_resolve_effective_theme_membership_respects_force_exclude_editorial() -
         reviewed_membership_computed_at=computed_at,
     )
 
-    resolved = resolve_effective_theme_membership("water", membership, editorial)
+    resolved = resolve_effective_theme_membership(
+        "water",
+        cast(Any, membership),
+        cast(Any, editorial),
+    )
 
     assert resolved is not None
     assert resolved.status == "suppressed"
     assert resolved.rationale_summary == "False positive after review."
 
 
-def test_resolve_effective_theme_membership_respects_force_include_without_automated_membership() -> None:
+def test_resolve_effective_theme_membership_respects_force_include_without_automated_membership(
+) -> None:
     editorial = SimpleNamespace(
         theme_slug="rail",
         editorial_decision="force_include",
@@ -159,7 +164,7 @@ def test_resolve_effective_theme_membership_respects_force_include_without_autom
         reviewed_membership_computed_at=None,
     )
 
-    resolved = resolve_effective_theme_membership("rail", None, editorial)
+    resolved = resolve_effective_theme_membership("rail", None, cast(Any, editorial))
 
     assert resolved is not None
     assert resolved.status == "accepted"
@@ -175,7 +180,7 @@ def test_theme_review_state_is_stale_when_membership_changes_after_review() -> N
         reviewed_membership_computed_at=reviewed_at.replace(microsecond=0),
     )
 
-    state = theme_review_state(membership, editorial)
+    state = theme_review_state(cast(Any, membership), cast(Any, editorial))
 
     assert state == "stale"
 
@@ -215,7 +220,11 @@ def test_evaluate_water_theme_rejects_name_only_art_read() -> None:
             canonical_name="Acequia Mural",
             normalized_category="art",
             normalized_subcategory="mural_public_art",
-            raw_tag_summary_json={"name": "Acequia Mural", "tourism": "artwork", "artwork_type": "mural"},
+            raw_tag_summary_json={
+                "name": "Acequia Mural",
+                "tourism": "artwork",
+                "artwork_type": "mural",
+            },
             aliases=[],
             evidence_items=[],
             theme_editorials=[],

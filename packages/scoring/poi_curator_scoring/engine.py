@@ -1,4 +1,4 @@
-from typing import Literal
+from typing import Literal, cast
 
 from poi_curator_domain.schemas import (
     AdminMatchDiagnosticItem,
@@ -8,14 +8,20 @@ from poi_curator_domain.schemas import (
     NearbyResult,
     NearbySuggestRequest,
     NearbySuggestResponse,
-    POIThemeItem,
     POIDetailResponse,
+    POIThemeItem,
     QuerySummary,
     RouteResult,
     RouteSuggestRequest,
     RouteSuggestResponse,
 )
-from poi_curator_domain.themes import THEME_LABELS, is_query_theme_active, theme_badge_label, theme_explanation_reason
+from poi_curator_domain.themes import (
+    THEME_LABELS,
+    ThemeSlug,
+    is_query_theme_active,
+    theme_badge_label,
+    theme_explanation_reason,
+)
 from shapely.geometry import Point
 
 from poi_curator_scoring.db_route_scoring import get_metric_transformer
@@ -61,8 +67,9 @@ def _to_route_result(
     badges = [*fixture.badges, "scaffold result"]
     why_it_matters = list(fixture.why_it_matters)
     if requested_theme is not None and requested_theme in fixture.themes:
-        theme_reason = theme_explanation_reason(requested_theme)
-        theme_badge = theme_badge_label(requested_theme)
+        typed_theme = cast(ThemeSlug, requested_theme)
+        theme_reason = theme_explanation_reason(typed_theme)
+        theme_badge = theme_badge_label(typed_theme)
         if theme_badge is not None:
             badges.append(theme_badge)
         if theme_reason is not None:
@@ -112,7 +119,7 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
         score += _route_fit_bonus(fixture)
         scored_results.append((score, fixture))
 
-    scored_results.sort(key=lambda item: item[0], reverse=True)
+    scored_results.sort(key=lambda item: (-item[0], item[1].poi_id))
     results = [
         _to_route_result(fixture, score, requested_theme=payload.theme)
         for score, fixture in scored_results[: payload.limit]
@@ -172,7 +179,7 @@ def _build_nearby_fixture_results(
         score += proximity_bonus + radius_fit
         scored_results.append((score, fixture, distance_m, estimated_access_minutes))
 
-    scored_results.sort(key=lambda item: item[0], reverse=True)
+    scored_results.sort(key=lambda item: (-item[0], item[1].poi_id))
     return [
         NearbyResult(
             poi_id=fixture.poi_id,
@@ -193,28 +200,11 @@ def _build_nearby_fixture_results(
             estimated_access_minutes=estimated_access_minutes,
             score=round(score, 1),
             score_breakdown=None,
-            why_it_matters=list(
-                dict.fromkeys(
-                    (
-                        [theme_explanation_reason(requested_theme)]
-                        if requested_theme is not None
-                        and requested_theme in fixture.themes
-                        and theme_explanation_reason(requested_theme) is not None
-                        else []
-                    )
-                    + fixture.why_it_matters
-                )
-            )[:3],
+            why_it_matters=fixture_why_it_matters(fixture, requested_theme),
             badges=list(
                 dict.fromkeys(
                     [*fixture.badges, "scaffold result"]
-                    + (
-                        [theme_badge_label(requested_theme)]
-                        if requested_theme is not None
-                        and requested_theme in fixture.themes
-                        and theme_badge_label(requested_theme) is not None
-                        else []
-                    )
+                    + fixture_theme_badges(fixture, requested_theme)
                 )
             ),
             extended_place=fixture.extended_place,
@@ -226,7 +216,7 @@ def _build_nearby_fixture_results(
 def _build_fixture_theme_items(themes: list[str]) -> list[POIThemeItem]:
     return [
         POIThemeItem(
-            theme_slug=theme_slug,
+            theme_slug=cast(ThemeSlug, theme_slug),
             label=THEME_LABELS.get(theme_slug, theme_slug),
             status="accepted",
             assignment_basis="rule",
@@ -237,6 +227,29 @@ def _build_fixture_theme_items(themes: list[str]) -> list[POIThemeItem]:
         )
         for theme_slug in themes
     ]
+
+
+def fixture_why_it_matters(
+    fixture: POIFixture,
+    requested_theme: str | None,
+) -> list[str]:
+    theme_reason = (
+        theme_explanation_reason(requested_theme)
+        if requested_theme is not None and requested_theme in fixture.themes
+        else None
+    )
+    reasons = ([theme_reason] if theme_reason is not None else []) + fixture.why_it_matters
+    return list(dict.fromkeys(reasons))[:3]
+
+
+def fixture_theme_badges(
+    fixture: POIFixture,
+    requested_theme: str | None,
+) -> list[str]:
+    if requested_theme is None or requested_theme not in fixture.themes:
+        return []
+    badge = theme_badge_label(requested_theme)
+    return [badge] if badge is not None else []
 
 
 def suggest_nearby_places(payload: NearbySuggestRequest) -> NearbySuggestResponse:

@@ -10,15 +10,16 @@ from poi_curator_domain.db import (
     POIAlias,
     POIEvidence,
     POISignals,
+    POIThemeMembershipEvidence,
     SourceRegistry,
 )
 from poi_curator_domain.descriptions import description_quality_score
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.settings import get_settings
-from poi_curator_domain.theme_service import sync_theme_memberships
 from poi_curator_domain.text import slugify
+from poi_curator_domain.theme_service import sync_theme_memberships
 from poi_curator_ingestion.normalize import build_short_description
-from sqlalchemy import delete, select
+from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
 from poi_curator_enrichment.city_gis import (
@@ -56,6 +57,7 @@ from poi_curator_enrichment.xlsx_reader import (
 )
 
 logger = logging.getLogger(__name__)
+WIKIDATA_SOURCE_ID = "wikidata"
 
 
 @dataclass(frozen=True)
@@ -153,6 +155,7 @@ def enrich_region_from_wikidata(
             continue
 
         apply_wikidata_entity(
+            session,
             poi,
             cache[wikidata_id],
             wikipedia_title_hint=wikipedia_title,
@@ -188,11 +191,13 @@ def latest_raw_tags_for_poi(poi: POI) -> dict[str, str]:
 
 
 def apply_wikidata_entity(
+    session: Session,
     poi: POI,
     entity: WikidataEntity,
     *,
     wikipedia_title_hint: str | None = None,
 ) -> None:
+    upsert_wikidata_evidence(session, poi, entity, wikipedia_title_hint=wikipedia_title_hint)
     poi.wikidata_id = entity.entity_id
     poi.wikipedia_title = wikipedia_title_hint or entity.wikipedia_title or poi.wikipedia_title
     if should_replace_short_description(poi, entity.description):
@@ -208,6 +213,59 @@ def apply_wikidata_entity(
             description_quality_score(poi.short_description, poi.normalized_subcategory),
         )
         poi.signals.computed_at = datetime.now(UTC)
+
+
+def upsert_wikidata_evidence(
+    session: Session,
+    poi: POI,
+    entity: WikidataEntity,
+    *,
+    wikipedia_title_hint: str | None = None,
+) -> POIEvidence:
+    ensure_wikidata_source_registry(session)
+    evidence_key = f"{poi.poi_id}:wikidata:{entity.entity_id}"
+    now = datetime.now(UTC)
+    evidence = session.scalar(
+        select(POIEvidence).where(POIEvidence.evidence_key == evidence_key)
+    )
+    if evidence is None:
+        evidence = POIEvidence(
+            evidence_key=evidence_key,
+            poi_id=poi.poi_id,
+            source_id=WIKIDATA_SOURCE_ID,
+            evidence_type="identity_link",
+            evidence_label=entity.label,
+            evidence_text=entity.description,
+            evidence_url=f"https://www.wikidata.org/wiki/{entity.entity_id}",
+            external_record_id=entity.entity_id,
+            confidence=0.85,
+            raw_evidence_json=wikidata_evidence_payload(entity, wikipedia_title_hint),
+            observed_at=now,
+        )
+        session.add(evidence)
+        return evidence
+
+    evidence.evidence_label = entity.label
+    evidence.evidence_text = entity.description
+    evidence.evidence_url = f"https://www.wikidata.org/wiki/{entity.entity_id}"
+    evidence.external_record_id = entity.entity_id
+    evidence.confidence = 0.85
+    evidence.raw_evidence_json = wikidata_evidence_payload(entity, wikipedia_title_hint)
+    evidence.observed_at = now
+    return evidence
+
+
+def wikidata_evidence_payload(
+    entity: WikidataEntity,
+    wikipedia_title_hint: str | None,
+) -> dict[str, str | None]:
+    return {
+        "entity_id": entity.entity_id,
+        "label": entity.label,
+        "description": entity.description,
+        "wikipedia_title": entity.wikipedia_title,
+        "wikipedia_title_hint": wikipedia_title_hint,
+    }
 
 
 def should_replace_short_description(
@@ -226,6 +284,32 @@ def should_replace_short_description(
 
 def chunked(values: list[str], size: int) -> list[list[str]]:
     return [values[index : index + size] for index in range(0, len(values), size)]
+
+
+def clear_evidence_for_pois_and_sources(
+    session: Session,
+    poi_ids: Sequence[str],
+    source_ids: Sequence[str],
+) -> None:
+    # FK delete order for evidence refresh: theme-membership evidence links reference
+    # poi_evidence, so clear those links before deleting source-scoped evidence rows.
+    if not poi_ids or not source_ids:
+        return
+    evidence_ids = select(POIEvidence.id).where(
+        POIEvidence.poi_id.in_(poi_ids),
+        POIEvidence.source_id.in_(source_ids),
+    )
+    session.execute(
+        delete(POIThemeMembershipEvidence).where(
+            POIThemeMembershipEvidence.poi_evidence_id.in_(evidence_ids)
+        )
+    )
+    session.execute(
+        delete(POIEvidence).where(
+            POIEvidence.poi_id.in_(poi_ids),
+            POIEvidence.source_id.in_(source_ids),
+        )
+    )
 
 
 def enrich_region_from_city_gis(
@@ -267,49 +351,47 @@ def enrich_region_from_city_gis(
     poi_by_id = {poi.poi_id: poi for poi in pois}
     source_ids = [layer.source_id for layer in CITY_GIS_LAYER_SPECS]
     poi_ids = list(poi_by_id)
-    if poi_ids:
-        session.execute(
-            delete(POIEvidence).where(
-                POIEvidence.poi_id.in_(poi_ids),
-                POIEvidence.source_id.in_(source_ids),
-            )
-        )
-    ensure_source_registry(session, base_url)
+    try:
+        clear_evidence_for_pois_and_sources(session, poi_ids, source_ids)
+        ensure_source_registry(session, base_url)
 
-    feature_count = 0
-    evidence_created = 0
-    unmatched_feature_count = 0
-    impacted_poi_ids: set[str] = set()
+        feature_count = 0
+        evidence_created = 0
+        unmatched_feature_count = 0
+        impacted_poi_ids: set[str] = set()
 
-    for layer in CITY_GIS_LAYER_SPECS:
-        payload = loader(base_url, layer.layer_id)
-        features = parse_city_gis_features(payload, layer=layer, base_url=base_url)
-        feature_count += len(features)
-        for feature in features:
-            if layer.kind == "point":
-                match = match_point_feature_to_poi(feature, candidate_pois)
-                if match is None:
+        for layer in CITY_GIS_LAYER_SPECS:
+            payload = loader(base_url, layer.layer_id)
+            features = parse_city_gis_features(payload, layer=layer, base_url=base_url)
+            feature_count += len(features)
+            for feature in features:
+                if layer.kind == "point":
+                    match = match_point_feature_to_poi(feature, candidate_pois)
+                    if match is None:
+                        unmatched_feature_count += 1
+                        continue
+                    poi = poi_by_id[match.poi_id]
+                    evidence = build_poi_evidence(feature, poi.poi_id, match.confidence)
+                    session.add(evidence)
+                    evidence_created += 1
+                    impacted_poi_ids.add(poi.poi_id)
+                    continue
+
+                matched_ids = poi_ids_within_polygon(feature, candidate_pois)
+                if not matched_ids:
                     unmatched_feature_count += 1
                     continue
-                poi = poi_by_id[match.poi_id]
-                evidence = build_poi_evidence(feature, poi.poi_id, match.confidence)
-                session.add(evidence)
-                evidence_created += 1
-                impacted_poi_ids.add(poi.poi_id)
-                continue
+                for poi_id in matched_ids:
+                    session.add(build_poi_evidence(feature, poi_id, layer.confidence))
+                    evidence_created += 1
+                    impacted_poi_ids.add(poi_id)
 
-            matched_ids = poi_ids_within_polygon(feature, candidate_pois)
-            if not matched_ids:
-                unmatched_feature_count += 1
-                continue
-            for poi_id in matched_ids:
-                session.add(build_poi_evidence(feature, poi_id, layer.confidence))
-                evidence_created += 1
-                impacted_poi_ids.add(poi_id)
-
-    session.flush()
-    recompute_evidence_signals(session, [poi_by_id[poi_id] for poi_id in impacted_poi_ids])
-    session.commit()
+        session.flush()
+        recompute_evidence_signals(session, [poi_by_id[poi_id] for poi_id in impacted_poi_ids])
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     summary = CityGISEnrichmentSummary(
         region=region,
         feature_count=feature_count,
@@ -358,50 +440,48 @@ def enrich_region_from_nrhp(
     )
     filtered_rows = filter_rows_for_region(rows, state=state_name, city=region)
     poi_ids = [poi.poi_id for poi in pois]
-    ensure_seeded_historic_aliases(session, region, pois)
-    if poi_ids:
-        session.execute(
-            delete(POIEvidence).where(
-                POIEvidence.poi_id.in_(poi_ids),
-                POIEvidence.source_id == NRHP_SOURCE_ID,
-            )
-        )
-    clear_match_diagnostics(session, NRHP_SOURCE_ID, region)
-    ensure_nrhp_source_registry(session)
+    try:
+        ensure_seeded_historic_aliases(session, region, pois)
+        clear_evidence_for_pois_and_sources(session, poi_ids, [NRHP_SOURCE_ID])
+        clear_match_diagnostics(session, NRHP_SOURCE_ID, region)
+        ensure_nrhp_source_registry(session)
 
-    evidence_created = 0
-    unmatched_row_count = 0
-    impacted_poi_ids: set[str] = set()
-    for row in filtered_rows:
-        evaluation = evaluate_register_row_match(row, pois)
-        match = evaluation.match
-        if match is None:
-            unmatched_row_count += 1
+        evidence_created = 0
+        unmatched_row_count = 0
+        impacted_poi_ids: set[str] = set()
+        for row in filtered_rows:
+            evaluation = evaluate_register_row_match(row, pois)
+            match = evaluation.match
+            if match is None:
+                unmatched_row_count += 1
+                session.add(
+                    build_match_diagnostic(
+                        row,
+                        source_id=NRHP_SOURCE_ID,
+                        region=region,
+                        best_candidate=evaluation.best_candidate,
+                    )
+                )
+                continue
+            poi = next(poi for poi in pois if poi.poi_id == match.poi_id)
+            poi.heritage_id = row.reference_number
             session.add(
-                build_match_diagnostic(
+                build_nrhp_evidence(
                     row,
-                    source_id=NRHP_SOURCE_ID,
-                    region=region,
-                    best_candidate=evaluation.best_candidate,
+                    poi.poi_id,
+                    match.confidence,
+                    match_strategy=match.match_strategy,
                 )
             )
-            continue
-        poi = next(poi for poi in pois if poi.poi_id == match.poi_id)
-        poi.heritage_id = row.reference_number
-        session.add(
-            build_nrhp_evidence(
-                row,
-                poi.poi_id,
-                match.confidence,
-                match_strategy=match.match_strategy,
-            )
-        )
-        evidence_created += 1
-        impacted_poi_ids.add(poi.poi_id)
+            evidence_created += 1
+            impacted_poi_ids.add(poi.poi_id)
 
-    session.flush()
-    recompute_evidence_signals(session, [poi for poi in pois if poi.poi_id in impacted_poi_ids])
-    session.commit()
+        session.flush()
+        recompute_evidence_signals(session, [poi for poi in pois if poi.poi_id in impacted_poi_ids])
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     summary = NRHPEnrichmentSummary(
         region=region,
         candidate_row_count=len(filtered_rows),
@@ -463,49 +543,47 @@ def enrich_region_from_nm_state_register(
     )
     filtered_rows = filter_rows_for_region(register_rows, state="NEW MEXICO", city=region)
     poi_ids = [poi.poi_id for poi in pois]
-    ensure_seeded_historic_aliases(session, region, pois)
-    if poi_ids:
-        session.execute(
-            delete(POIEvidence).where(
-                POIEvidence.poi_id.in_(poi_ids),
-                POIEvidence.source_id == NM_STATE_REGISTER_SOURCE_ID,
-            )
-        )
-    clear_match_diagnostics(session, NM_STATE_REGISTER_SOURCE_ID, region)
-    ensure_state_register_source_registry(session)
+    try:
+        ensure_seeded_historic_aliases(session, region, pois)
+        clear_evidence_for_pois_and_sources(session, poi_ids, [NM_STATE_REGISTER_SOURCE_ID])
+        clear_match_diagnostics(session, NM_STATE_REGISTER_SOURCE_ID, region)
+        ensure_state_register_source_registry(session)
 
-    evidence_created = 0
-    unmatched_row_count = 0
-    impacted_poi_ids: set[str] = set()
-    for row in filtered_rows:
-        evaluation = evaluate_register_row_match(row, pois, threshold=0.8)
-        match = evaluation.match
-        if match is None:
-            unmatched_row_count += 1
+        evidence_created = 0
+        unmatched_row_count = 0
+        impacted_poi_ids: set[str] = set()
+        for row in filtered_rows:
+            evaluation = evaluate_register_row_match(row, pois, threshold=0.8)
+            match = evaluation.match
+            if match is None:
+                unmatched_row_count += 1
+                session.add(
+                    build_match_diagnostic(
+                        row,
+                        source_id=NM_STATE_REGISTER_SOURCE_ID,
+                        region=region,
+                        best_candidate=evaluation.best_candidate,
+                    )
+                )
+                continue
+            poi = next(poi for poi in pois if poi.poi_id == match.poi_id)
             session.add(
-                build_match_diagnostic(
+                build_state_register_evidence(
                     row,
-                    source_id=NM_STATE_REGISTER_SOURCE_ID,
-                    region=region,
-                    best_candidate=evaluation.best_candidate,
+                    poi.poi_id,
+                    match.confidence,
+                    match_strategy=match.match_strategy,
                 )
             )
-            continue
-        poi = next(poi for poi in pois if poi.poi_id == match.poi_id)
-        session.add(
-            build_state_register_evidence(
-                row,
-                poi.poi_id,
-                match.confidence,
-                match_strategy=match.match_strategy,
-            )
-        )
-        evidence_created += 1
-        impacted_poi_ids.add(poi.poi_id)
+            evidence_created += 1
+            impacted_poi_ids.add(poi.poi_id)
 
-    session.flush()
-    recompute_evidence_signals(session, [poi for poi in pois if poi.poi_id in impacted_poi_ids])
-    session.commit()
+        session.flush()
+        recompute_evidence_signals(session, [poi for poi in pois if poi.poi_id in impacted_poi_ids])
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
     summary = StateRegisterEnrichmentSummary(
         region=region,
         candidate_row_count=len(filtered_rows),
@@ -557,6 +635,38 @@ def ensure_source_registry(session: Session, base_url: str) -> None:
         source.ingest_method = "arcgis_rest"
         source.is_active = True
         source.updated_at = now
+
+
+def ensure_wikidata_source_registry(session: Session) -> None:
+    settings = get_settings()
+    now = datetime.now(UTC)
+    source = session.get(SourceRegistry, WIKIDATA_SOURCE_ID)
+    if source is None:
+        session.add(
+            SourceRegistry(
+                source_id=WIKIDATA_SOURCE_ID,
+                organization_name="Wikidata",
+                source_name="Wikidata entity metadata",
+                source_type="knowledge_graph",
+                trust_class="community_knowledge_graph",
+                base_url=settings.wikidata_api_url,
+                license_notes="Wikidata entity metadata used as attributed evidence.",
+                crawl_allowed=True,
+                ingest_method="wikidata_api",
+                is_active=True,
+                created_at=now,
+                updated_at=now,
+            )
+        )
+        return
+    source.organization_name = "Wikidata"
+    source.source_name = "Wikidata entity metadata"
+    source.source_type = "knowledge_graph"
+    source.trust_class = "community_knowledge_graph"
+    source.base_url = settings.wikidata_api_url
+    source.ingest_method = "wikidata_api"
+    source.is_active = True
+    source.updated_at = now
 
 
 def ensure_nrhp_source_registry(session: Session) -> None:
@@ -656,10 +766,32 @@ def ensure_seeded_historic_aliases(session: Session, region: str, pois: Sequence
 
 
 def clear_match_diagnostics(session: Session, source_id: str, region: str) -> None:
+    reviewed_filter = or_(
+        OfficialMatchDiagnostic.reviewed_at.is_not(None),
+        OfficialMatchDiagnostic.reviewed_by.is_not(None),
+        OfficialMatchDiagnostic.resolved_poi_id.is_not(None),
+        OfficialMatchDiagnostic.resolution_method.is_not(None),
+        OfficialMatchDiagnostic.status.not_in(("unreviewed", "unmatched")),
+    )
+    reviewed_count = session.scalar(
+        select(OfficialMatchDiagnostic.id)
+        .where(
+            OfficialMatchDiagnostic.source_id == source_id,
+            OfficialMatchDiagnostic.region == region,
+            reviewed_filter,
+        )
+        .limit(1)
+    )
+    if reviewed_count is not None:
+        logger.warning(
+            "Skipping reviewed match diagnostics during refresh.",
+            extra={"source_id": source_id, "region": region},
+        )
     session.execute(
         delete(OfficialMatchDiagnostic).where(
             OfficialMatchDiagnostic.source_id == source_id,
             OfficialMatchDiagnostic.region == region,
+            ~reviewed_filter,
         )
     )
 

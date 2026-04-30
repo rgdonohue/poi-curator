@@ -21,12 +21,15 @@ from poi_curator_domain.db import (
     SourceRegistry,
     get_session_factory,
 )
+from poi_curator_domain.settings import get_settings
 from poi_curator_enrichment.historic_register import NM_STATE_REGISTER_SOURCE_ID
 from shapely.geometry import Point
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 
 client = TestClient(app)
+ADMIN_KEY = "unit-test-admin-key"
+ADMIN_HEADERS = {"X-POI-Curator-Admin-Key": ADMIN_KEY}
 
 
 class EditorialCase(TypedDict):
@@ -38,6 +41,16 @@ class EditorialCase(TypedDict):
 
 class EditorialDBFixture(TypedDict):
     create_case: Callable[..., EditorialCase]
+
+
+@pytest.fixture(autouse=True)
+def configure_admin_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setenv("POI_CURATOR_ADMIN_KEY", ADMIN_KEY)
+    get_settings.cache_clear()
+    client.headers.update(ADMIN_HEADERS)
+    yield
+    client.headers.pop("X-POI-Curator-Admin-Key", None)
+    get_settings.cache_clear()
 
 
 @pytest.fixture

@@ -1,9 +1,13 @@
 import logging
+from collections.abc import Sequence
+from math import isfinite
 from pathlib import Path
+from typing import Any
 
 import uvicorn
 from fastapi import FastAPI
-from fastapi.responses import FileResponse
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from poi_curator_domain.settings import get_settings
 
@@ -27,6 +31,17 @@ def create_app() -> FastAPI:
     app.include_router(api_router, prefix="/v1")
     app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
+    @app.exception_handler(RequestValidationError)
+    async def validation_exception_handler(
+        request: object,
+        exc: RequestValidationError,
+    ) -> JSONResponse:
+        del request
+        return JSONResponse(
+            status_code=422,
+            content={"detail": sanitize_validation_errors(exc.errors())},
+        )
+
     @app.get("/", tags=["meta"])
     def root() -> dict[str, str]:
         return {
@@ -41,6 +56,24 @@ def create_app() -> FastAPI:
         return FileResponse(static_dir / "map-test" / "index.html")
 
     return app
+
+
+def sanitize_validation_errors(errors: Sequence[Any]) -> list[Any]:
+    return [sanitize_validation_value(error) for error in errors]
+
+
+def sanitize_validation_value(value: Any) -> Any:
+    if isinstance(value, float) and not isfinite(value):
+        return str(value)
+    if isinstance(value, ValueError):
+        return str(value)
+    if isinstance(value, dict):
+        return {key: sanitize_validation_value(item) for key, item in value.items()}
+    if isinstance(value, list):
+        return [sanitize_validation_value(item) for item in value]
+    if isinstance(value, tuple):
+        return [sanitize_validation_value(item) for item in value]
+    return value
 
 
 app = create_app()

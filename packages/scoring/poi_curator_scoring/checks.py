@@ -4,9 +4,11 @@ import re
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import orjson
+from poi_curator_domain.schemas import GeoLineString, LatLonPoint, NamedPoint, TravelMode
+from poi_curator_domain.themes import ThemeSlug
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -111,11 +113,11 @@ def build_inline_nearby_case(
         label=resolved_label,
         purpose="Inline nearby check from the CLI.",
         category=category,
-        theme=theme,
-        travel_mode=travel_mode,
+        theme=cast(ThemeSlug | None, theme),
+        travel_mode=cast(TravelMode, travel_mode),
         region_hint=region_hint,
         limit=limit,
-        center={"lat": lat, "lon": lon},
+        center=LatLonPoint(lat=lat, lon=lon),
         radius_meters=radius_meters,
     )
 
@@ -140,16 +142,13 @@ def build_inline_route_case(
         label=resolved_label,
         purpose="Inline route check from the CLI.",
         category=category,
-        theme=theme,
-        travel_mode=travel_mode,
+        theme=cast(ThemeSlug | None, theme),
+        travel_mode=cast(TravelMode, travel_mode),
         region_hint=region_hint,
         limit=limit,
-        route_geometry={
-            "type": "LineString",
-            "coordinates": [[lon, lat] for lon, lat in coordinates],
-        },
-        origin={"name": origin_name, "coordinates": list(coordinates[0])},
-        destination={"name": destination_name, "coordinates": list(coordinates[-1])},
+        route_geometry=GeoLineString(coordinates=[[lon, lat] for lon, lat in coordinates]),
+        origin=NamedPoint(name=origin_name, coordinates=list(coordinates[0])),
+        destination=NamedPoint(name=destination_name, coordinates=list(coordinates[-1])),
         max_detour_meters=max_detour_meters,
         max_extra_minutes=max_extra_minutes,
     )

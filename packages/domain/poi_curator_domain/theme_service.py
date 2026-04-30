@@ -3,7 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from sqlalchemy.orm import Session
 
@@ -70,7 +70,10 @@ def evaluate_water_theme(poi: POI) -> EvaluatedThemeMembership | None:
         reasons.append(f"OSM waterway signal is present ({waterway_value})")
 
     has_acequia_name = "acequia" in lowered_name or any("acequia" in alias for alias in alias_names)
-    if has_acequia_name and _supports_name_only_water_read(normalized_category, normalized_subcategory):
+    if has_acequia_name and _supports_name_only_water_read(
+        normalized_category,
+        normalized_subcategory,
+    ):
         has_direct_rule = True
         confidence += 0.65
         reasons.append("Canonical or alias naming explicitly references an acequia")
@@ -183,14 +186,14 @@ def evaluate_theme_memberships(poi: POI) -> dict[ThemeSlug, EvaluatedThemeMember
     return results
 
 
-def get_theme_membership_by_slug(poi: POI, theme_slug: ThemeSlug) -> POIThemeMembership | None:
+def get_theme_membership_by_slug(poi: POI, theme_slug: str) -> POIThemeMembership | None:
     for membership in getattr(poi, "theme_memberships", []) or []:
         if str(membership.theme_slug) == theme_slug:
             return membership
     return None
 
 
-def get_theme_editorial_by_slug(poi: POI, theme_slug: ThemeSlug) -> "POIThemeEditorial | None":
+def get_theme_editorial_by_slug(poi: POI, theme_slug: str) -> POIThemeEditorial | None:
     for editorial in getattr(poi, "theme_editorials", []) or []:
         if str(editorial.theme_slug) == theme_slug:
             return editorial
@@ -200,17 +203,18 @@ def get_theme_editorial_by_slug(poi: POI, theme_slug: ThemeSlug) -> "POIThemeEdi
 def reviewable_theme_slugs(poi: POI) -> tuple[ThemeSlug, ...]:
     slugs: list[ThemeSlug] = []
     for theme_slug in THEME_LABELS:
+        typed_theme_slug = cast(ThemeSlug, theme_slug)
         if (
-            get_theme_membership_by_slug(poi, theme_slug) is not None
-            or get_theme_editorial_by_slug(poi, theme_slug) is not None
+            get_theme_membership_by_slug(poi, typed_theme_slug) is not None
+            or get_theme_editorial_by_slug(poi, typed_theme_slug) is not None
         ):
-            slugs.append(theme_slug)
+            slugs.append(typed_theme_slug)
     return tuple(slugs)
 
 
 def theme_review_state(
     membership: POIThemeMembership | None,
-    editorial: "POIThemeEditorial | None",
+    editorial: POIThemeEditorial | None,
 ) -> ThemeReviewState:
     if editorial is None or editorial.reviewed_at is None:
         return "unreviewed"
@@ -222,23 +226,29 @@ def theme_review_state(
 
 
 def resolve_effective_theme_membership(
-    theme_slug: ThemeSlug,
+    theme_slug: str,
     membership: POIThemeMembership | None,
-    editorial: "POIThemeEditorial | None",
+    editorial: POIThemeEditorial | None,
 ) -> EvaluatedThemeMembership | None:
     if editorial is not None and editorial.editorial_decision == "force_exclude":
         return EvaluatedThemeMembership(
-            theme_slug=theme_slug,
+            theme_slug=cast(ThemeSlug, theme_slug),
             status="suppressed",
-            assignment_basis="editorial" if membership is None else membership.assignment_basis,
+            assignment_basis=(
+                "editorial"
+                if membership is None
+                else cast(ThemeAssignmentBasis, membership.assignment_basis)
+            ),
             confidence=0.0 if membership is None else round(float(membership.confidence), 2),
             rationale_summary=editorial.notes or "Suppressed by editorial review.",
             evidence_ids=_membership_evidence_ids(membership),
         )
     if editorial is not None and editorial.editorial_decision == "force_include":
-        automated_confidence = round(float(membership.confidence), 2) if membership is not None else 1.0
+        automated_confidence = (
+            round(float(membership.confidence), 2) if membership is not None else 1.0
+        )
         return EvaluatedThemeMembership(
-            theme_slug=theme_slug,
+            theme_slug=cast(ThemeSlug, theme_slug),
             status="accepted",
             assignment_basis="editorial" if membership is None else "mixed",
             confidence=max(automated_confidence, 0.9),
@@ -248,9 +258,9 @@ def resolve_effective_theme_membership(
     if membership is None:
         return None
     return EvaluatedThemeMembership(
-        theme_slug=theme_slug,
-        status=membership.status,
-        assignment_basis=membership.assignment_basis,
+        theme_slug=cast(ThemeSlug, theme_slug),
+        status=cast(ThemeStatus, membership.status),
+        assignment_basis=cast(ThemeAssignmentBasis, membership.assignment_basis),
         confidence=round(float(membership.confidence), 2),
         rationale_summary=membership.rationale_summary or "",
         evidence_ids=_membership_evidence_ids(membership),
@@ -288,7 +298,8 @@ def _sync_single_poi(session: Session, poi: POI) -> bool:
     changed = False
     evaluated = evaluate_theme_memberships(poi)
     membership_by_slug = {
-        str(membership.theme_slug): membership for membership in getattr(poi, "theme_memberships", []) or []
+        str(membership.theme_slug): membership
+        for membership in getattr(poi, "theme_memberships", []) or []
     }
 
     for theme_slug in SYNC_THEMES:
@@ -367,7 +378,10 @@ def _membership_evidence_ids(membership: POIThemeMembership | None) -> tuple[int
     if membership is None:
         return ()
     return tuple(
-        sorted(int(link.poi_evidence_id) for link in getattr(membership, "evidence_links", []) or [])
+        sorted(
+            int(link.poi_evidence_id)
+            for link in getattr(membership, "evidence_links", []) or []
+        )
     )
 
 

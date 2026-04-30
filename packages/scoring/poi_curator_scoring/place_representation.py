@@ -133,7 +133,10 @@ def _build_encounter_anchors(
         line = _longest_line(geometry)
         for index, point in enumerate(
             _dedupe_points(
-                [line.interpolate(position, normalized=True) for position in _CORRIDOR_SAMPLE_POSITIONS],
+                [
+                    line.interpolate(position, normalized=True)
+                    for position in _CORRIDOR_SAMPLE_POSITIONS
+                ],
                 primary_anchor,
             ),
             start=1,

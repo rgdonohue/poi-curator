@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from pathlib import Path
 
 from poi_curator_scoring.checks import (
     CheckRun,
@@ -34,7 +35,7 @@ def test_build_inline_route_case_uses_first_and_last_coords() -> None:
     assert len(case.route_geometry.coordinates) == 3
 
 
-def test_render_terminal_run_and_write_report_files(tmp_path) -> None:
+def test_render_terminal_run_and_write_report_files(tmp_path: Path) -> None:
     run = CheckRun(
         case_id="nearby-railyard-rail",
         label="Railyard Rail Nearby",
@@ -92,7 +93,7 @@ def test_render_terminal_run_and_write_report_files(tmp_path) -> None:
     assert "POI Curator Check Report" in md_out.read_text(encoding="utf-8")
 
 
-def test_write_review_files_defaults_to_timestamped_json(tmp_path) -> None:
+def test_write_review_files_defaults_to_timestamped_json(tmp_path: Path) -> None:
     review = ReviewArtifact(
         case_id="nearby-railyard-rail",
         label="Railyard Rail Nearby",

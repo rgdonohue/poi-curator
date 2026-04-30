@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 from poi_curator_scoring.check_suites import (
@@ -42,7 +43,7 @@ def test_render_suite_index_markdown_includes_paths_and_counts() -> None:
         case_ids=("nearby-railyard-rail",),
     )
     report = CheckReport(
-        generated_at="2026-04-07T12:00:00Z",
+        generated_at=datetime(2026, 4, 7, 12, 0, tzinfo=UTC),
         fixtures_path="data/fixtures/eval_santa_fe.json",
         run_count=1,
         passed_count=1,

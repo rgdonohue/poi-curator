@@ -14,16 +14,29 @@ from poi_curator_domain.db import (
     POIEvidence,
     POISignals,
     POISourceRaw,
-    POIThemeMembershipEvidence,
     POIThemeMembership,
+    POIThemeMembershipEvidence,
     SourceRegistry,
     get_session_factory,
 )
+from poi_curator_domain.settings import get_settings
 from shapely.geometry import LineString, Point
 from sqlalchemy import delete, select, text
 from sqlalchemy.exc import OperationalError
 
 client = TestClient(app)
+ADMIN_KEY = "integration-test-admin-key"
+ADMIN_HEADERS = {"X-POI-Curator-Admin-Key": ADMIN_KEY}
+
+
+@pytest.fixture(autouse=True)
+def configure_admin_key(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
+    monkeypatch.setenv("POI_CURATOR_ADMIN_KEY", ADMIN_KEY)
+    get_settings.cache_clear()
+    client.headers.update(ADMIN_HEADERS)
+    yield
+    client.headers.pop("X-POI-Curator-Admin-Key", None)
+    get_settings.cache_clear()
 
 
 @pytest.fixture
@@ -198,7 +211,9 @@ def db_query_fixture() -> Iterator[dict[str, str]]:
                     normalized_category="culture",
                     normalized_subcategory="neighborhood_corridor",
                     display_categories=["culture"],
-                    short_description="Linear cultural corridor for geometry-backed integration testing.",
+                    short_description=(
+                        "Linear cultural corridor for geometry-backed integration testing."
+                    ),
                     primary_source="test",
                     raw_tag_summary_json={"name": "Integration Story Corridor"},
                     historical_flag=False,
@@ -450,7 +465,10 @@ def test_nearby_suggest_water_theme_filters_and_persists_membership(
     payload = response.json()
     result_ids = [item["poi_id"] for item in payload["results"]]
     assert result_ids == [db_query_fixture["near_poi_id"]]
-    assert any(reason.startswith("reveals acequia or water corridor") for reason in payload["results"][0]["why_it_matters"])
+    assert any(
+        reason.startswith("reveals acequia or water corridor")
+        for reason in payload["results"][0]["why_it_matters"]
+    )
     assert "water theme" in payload["results"][0]["badges"]
 
     with get_session_factory()() as session:

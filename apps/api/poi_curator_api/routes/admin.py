@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, Header, HTTPException, Query
 from poi_curator_domain.schemas import (
     AdminAliasFromDiagnosticRequest,
     AdminAliasMutationResponse,
@@ -21,10 +21,24 @@ from poi_curator_domain.schemas import (
     AdminThemeReviewResponse,
     AdminThemeSummaryItem,
 )
+from poi_curator_domain.settings import get_settings
 
 from poi_curator_api.dependencies import DatabaseSession, ScoringBackendDep
 
-router = APIRouter(prefix="/admin", tags=["admin"])
+
+def require_admin_api_key(
+    admin_key: str | None = Header(default=None, alias="X-POI-Curator-Admin-Key"),
+) -> None:
+    expected_key = get_settings().admin_key
+    if expected_key is None or not expected_key or admin_key != expected_key:
+        raise HTTPException(status_code=401, detail="Invalid or missing admin API key.")
+
+
+router = APIRouter(
+    prefix="/admin",
+    tags=["admin"],
+    dependencies=[Depends(require_admin_api_key)],
+)
 
 
 @router.get("/poi", response_model=list[AdminPOIItem])

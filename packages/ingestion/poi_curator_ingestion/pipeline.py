@@ -1,4 +1,5 @@
 import logging
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
@@ -9,16 +10,22 @@ from geoalchemy2.shape import from_shape
 from poi_curator_domain.db import (
     POI,
     IngestRun,
+    OfficialMatchDiagnostic,
+    POIAlias,
     POIEditorial,
     POIEvidence,
     POISignals,
     POISourceRaw,
+    POIThemeEditorial,
+    POIThemeMembership,
+    POIThemeMembershipEvidence,
+    SourceRegistry,
 )
 from poi_curator_domain.descriptions import description_quality_score
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.regions import RegionSpec
 from poi_curator_domain.theme_service import sync_theme_memberships
-from sqlalchemy import delete, false, select
+from sqlalchemy import delete, false, select, true
 from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, joinedload
 
@@ -30,6 +37,7 @@ from poi_curator_ingestion.normalize import (
 )
 
 OSM_SOURCE_NAME = "osm_overpass"
+OSM_OVERWRITE_DIAGNOSTIC_STRATEGY = "canonical_overwrite_protection"
 logger = logging.getLogger(__name__)
 
 
@@ -42,6 +50,7 @@ class OSMIngestSummary:
     canonical_inserted: int
     canonical_updated: int
     skipped_without_name_or_type: int
+    stale_deactivated: int
     ingest_run_id: int
 
 
@@ -61,10 +70,20 @@ class OSMRefreshSummary:
     skipped_without_name_or_type: int
 
 
+@dataclass(frozen=True)
+class CanonicalOverwriteConflict:
+    field_name: str
+    existing_value: Any
+    incoming_value: Any
+    reason: str
+
+
 def ingest_osm_elements(
     session: Session,
     region: RegionSpec,
     elements: list[dict[str, Any]],
+    *,
+    deactivate_stale: bool = True,
 ) -> OSMIngestSummary:
     log_event(logger, "osm_ingest_started", region=region.slug, fetched_count=len(elements))
     started_at = datetime.now(UTC)
@@ -89,6 +108,7 @@ def ingest_osm_elements(
     canonical_inserted = 0
     canonical_updated = 0
     skipped_without_name_or_type = 0
+    active_osm_ids: set[str] = set()
 
     current_records = session.scalars(
         select(POISourceRaw)
@@ -107,11 +127,16 @@ def ingest_osm_elements(
             skipped_without_name_or_type += 1
             continue
 
+        active_osm_ids.add(normalized.source_record_id)
         created = upsert_canonical_poi(session, raw_record, normalized)
         if created:
             canonical_inserted += 1
         else:
             canonical_updated += 1
+
+    stale_deactivated = 0
+    if deactivate_stale:
+        stale_deactivated = deactivate_stale_osm_pois(session, region, active_osm_ids)
 
     ingest_run.status = "completed"
     ingest_run.raw_count = len(elements)
@@ -128,6 +153,7 @@ def ingest_osm_elements(
         canonical_inserted=canonical_inserted,
         canonical_updated=canonical_updated,
         skipped_without_name_or_type=skipped_without_name_or_type,
+        stale_deactivated=stale_deactivated,
         ingest_run_id=ingest_run.id,
     )
     log_event(
@@ -140,6 +166,7 @@ def ingest_osm_elements(
         canonical_inserted=summary.canonical_inserted,
         canonical_updated=summary.canonical_updated,
         skipped=summary.skipped_without_name_or_type,
+        stale_deactivated=summary.stale_deactivated,
         ingest_run_id=summary.ingest_run_id,
     )
     return summary
@@ -192,53 +219,57 @@ def refresh_osm_region_from_current_raw(session: Session, region: RegionSpec) ->
 
 
 def reset_osm_region(session: Session, region: RegionSpec) -> OSMResetSummary:
+    # FK delete order: membership evidence links -> theme memberships/editorials, aliases,
+    # match diagnostics, evidence, source raw, editorial/signals -> canonical POIs -> ingest runs.
     log_event(logger, "osm_reset_started", region=region.slug)
-    poi_ids = session.scalars(
-        select(POI.poi_id).where(
-            POI.city == region.slug,
-            POI.primary_source == OSM_SOURCE_NAME,
-        )
-    ).all()
-    ingest_run_ids = select(IngestRun.id).where(
-        IngestRun.region == region.slug,
-        IngestRun.source_name == OSM_SOURCE_NAME,
-    )
-
-    raw_deleted = cast(
-        CursorResult[Any],
-        session.execute(
-        delete(POISourceRaw).where(
-            (POISourceRaw.canonical_poi_id.in_(poi_ids) if poi_ids else false())
-            | (
-                (POISourceRaw.source_name == OSM_SOURCE_NAME)
-                & POISourceRaw.ingest_run_id.in_(ingest_run_ids)
-            )
-        )
-        ),
-    )
-    if poi_ids:
-        session.execute(delete(POIEvidence).where(POIEvidence.poi_id.in_(poi_ids)))
-        session.execute(delete(POIEditorial).where(POIEditorial.poi_id.in_(poi_ids)))
-        session.execute(delete(POISignals).where(POISignals.poi_id.in_(poi_ids)))
-    poi_deleted = cast(
-        CursorResult[Any],
-        session.execute(
-            delete(POI).where(
+    try:
+        poi_ids = session.scalars(
+            select(POI.poi_id).where(
                 POI.city == region.slug,
                 POI.primary_source == OSM_SOURCE_NAME,
             )
-        ),
-    )
-    ingest_runs_deleted = cast(
-        CursorResult[Any],
-        session.execute(
-            delete(IngestRun).where(
-                IngestRun.region == region.slug,
-                IngestRun.source_name == OSM_SOURCE_NAME,
+        ).all()
+        ingest_run_ids = select(IngestRun.id).where(
+            IngestRun.region == region.slug,
+            IngestRun.source_name == OSM_SOURCE_NAME,
+        )
+
+        raw_deleted = cast(
+            CursorResult[Any],
+            session.execute(
+                delete(POISourceRaw).where(
+                    (POISourceRaw.canonical_poi_id.in_(poi_ids) if poi_ids else false())
+                    | (
+                        (POISourceRaw.source_name == OSM_SOURCE_NAME)
+                        & POISourceRaw.ingest_run_id.in_(ingest_run_ids)
+                    )
+                )
+            ),
+        )
+        if poi_ids:
+            delete_poi_dependents(session, poi_ids)
+        poi_deleted = cast(
+            CursorResult[Any],
+            session.execute(
+                delete(POI).where(
+                    POI.city == region.slug,
+                    POI.primary_source == OSM_SOURCE_NAME,
+                )
+            ),
+        )
+        ingest_runs_deleted = cast(
+            CursorResult[Any],
+            session.execute(
+                delete(IngestRun).where(
+                    IngestRun.region == region.slug,
+                    IngestRun.source_name == OSM_SOURCE_NAME,
+                )
             )
-        ),
-    )
-    session.commit()
+        )
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
 
     summary = OSMResetSummary(
         region=region.slug,
@@ -255,6 +286,60 @@ def reset_osm_region(session: Session, region: RegionSpec) -> OSMResetSummary:
         ingest_runs_deleted=summary.ingest_runs_deleted,
     )
     return summary
+
+
+def deactivate_stale_osm_pois(
+    session: Session,
+    region: RegionSpec,
+    active_source_record_ids: set[str],
+) -> int:
+    stale_filter = (
+        POI.osm_id.not_in(active_source_record_ids) if active_source_record_ids else true()
+    )
+    stale_pois = session.scalars(
+        select(POI).where(
+            POI.city == region.slug,
+            POI.primary_source == OSM_SOURCE_NAME,
+            POI.is_active.is_(True),
+            stale_filter,
+        )
+    ).all()
+    now = datetime.now(UTC)
+    for poi in stale_pois:
+        poi.is_active = False
+        poi.review_status = "stale"
+        poi.updated_at = now
+    if stale_pois:
+        log_event(
+            logger,
+            "osm_stale_pois_deactivated",
+            region=region.slug,
+            stale_deactivated=len(stale_pois),
+        )
+    return len(stale_pois)
+
+
+def delete_poi_dependents(session: Session, poi_ids: Sequence[str]) -> None:
+    membership_ids = select(POIThemeMembership.id).where(POIThemeMembership.poi_id.in_(poi_ids))
+    evidence_ids = select(POIEvidence.id).where(POIEvidence.poi_id.in_(poi_ids))
+    session.execute(
+        delete(POIThemeMembershipEvidence).where(
+            (POIThemeMembershipEvidence.membership_id.in_(membership_ids))
+            | (POIThemeMembershipEvidence.poi_evidence_id.in_(evidence_ids))
+        )
+    )
+    session.execute(
+        delete(OfficialMatchDiagnostic).where(
+            (OfficialMatchDiagnostic.matched_poi_id.in_(poi_ids))
+            | (OfficialMatchDiagnostic.resolved_poi_id.in_(poi_ids))
+        )
+    )
+    session.execute(delete(POIThemeEditorial).where(POIThemeEditorial.poi_id.in_(poi_ids)))
+    session.execute(delete(POIThemeMembership).where(POIThemeMembership.poi_id.in_(poi_ids)))
+    session.execute(delete(POIAlias).where(POIAlias.poi_id.in_(poi_ids)))
+    session.execute(delete(POIEvidence).where(POIEvidence.poi_id.in_(poi_ids)))
+    session.execute(delete(POIEditorial).where(POIEditorial.poi_id.in_(poi_ids)))
+    session.execute(delete(POISignals).where(POISignals.poi_id.in_(poi_ids)))
 
 
 def persist_raw_element(session: Session, ingest_run: IngestRun, element: dict[str, Any]) -> bool:
@@ -342,28 +427,11 @@ def upsert_canonical_poi(
         session.add(poi)
         session.flush()
     else:
-        poi.canonical_name = normalized.canonical_name
-        poi.slug = normalized.slug
-        poi.geom = from_shape(normalized.geom, srid=4326)
-        poi.centroid = from_shape(normalized.centroid, srid=4326)
-        poi.city = normalized.city
-        poi.region = normalized.region
-        poi.country = normalized.country
-        poi.normalized_category = normalized.normalized_category
-        poi.normalized_subcategory = normalized.normalized_subcategory
-        poi.display_categories = normalized.display_categories
-        poi.short_description = normalized.short_description
-        poi.raw_tag_summary_json = normalized.raw_tag_summary
-        poi.historical_flag = normalized.historical_flag
-        poi.cultural_flag = normalized.cultural_flag
-        poi.scenic_flag = normalized.scenic_flag
-        poi.infrastructure_flag = normalized.infrastructure_flag
-        poi.food_identity_flag = normalized.food_identity_flag
-        poi.walk_affinity_hint = normalized.walk_affinity_hint
-        poi.drive_affinity_hint = normalized.drive_affinity_hint
-        poi.base_significance_score = normalized.base_significance_score
-        poi.quality_score = normalized.quality_score
-        poi.updated_at = datetime.now(UTC)
+        conflicts = update_existing_poi_from_osm(poi, normalized)
+        emit_canonical_overwrite_diagnostic(session, poi, normalized, conflicts)
+        poi.is_active = True
+        if poi.review_status == "stale":
+            poi.review_status = "needs_review"
 
     raw_record.canonical_poi = poi
     upsert_signals(session, poi, raw_record.raw_payload_json.get("tags", {}))
@@ -371,6 +439,226 @@ def upsert_canonical_poi(
     sync_theme_memberships(session, [poi])
     session.flush()
     return created
+
+
+def update_existing_poi_from_osm(
+    poi: POI,
+    normalized: NormalizedPOI,
+) -> list[CanonicalOverwriteConflict]:
+    conflicts: list[CanonicalOverwriteConflict] = []
+
+    assign_osm_value(
+        poi,
+        "canonical_name",
+        normalized.canonical_name,
+        protection_group="title",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "slug",
+        normalized.slug,
+        protection_group="title",
+        conflicts=conflicts,
+    )
+    poi.geom = from_shape(normalized.geom, srid=4326)
+    poi.centroid = from_shape(normalized.centroid, srid=4326)
+    poi.city = normalized.city
+    poi.region = normalized.region
+    poi.country = normalized.country
+    assign_osm_value(
+        poi,
+        "normalized_category",
+        normalized.normalized_category,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "normalized_subcategory",
+        normalized.normalized_subcategory,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "display_categories",
+        normalized.display_categories,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "short_description",
+        normalized.short_description,
+        protection_group="description",
+        conflicts=conflicts,
+    )
+    poi.raw_tag_summary_json = normalized.raw_tag_summary
+    assign_osm_value(
+        poi,
+        "historical_flag",
+        normalized.historical_flag,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "cultural_flag",
+        normalized.cultural_flag,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "scenic_flag",
+        normalized.scenic_flag,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "infrastructure_flag",
+        normalized.infrastructure_flag,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    assign_osm_value(
+        poi,
+        "food_identity_flag",
+        normalized.food_identity_flag,
+        protection_group="category",
+        conflicts=conflicts,
+    )
+    poi.walk_affinity_hint = normalized.walk_affinity_hint
+    poi.drive_affinity_hint = normalized.drive_affinity_hint
+    poi.base_significance_score = normalized.base_significance_score
+    poi.quality_score = normalized.quality_score
+    poi.updated_at = datetime.now(UTC)
+    return conflicts
+
+
+def assign_osm_value(
+    poi: POI,
+    field_name: str,
+    incoming_value: Any,
+    *,
+    protection_group: str,
+    conflicts: list[CanonicalOverwriteConflict],
+) -> None:
+    existing_value = getattr(poi, field_name)
+    if existing_value == incoming_value:
+        return
+    if osm_field_is_protected(poi, protection_group):
+        conflicts.append(
+            CanonicalOverwriteConflict(
+                field_name=field_name,
+                existing_value=existing_value,
+                incoming_value=incoming_value,
+                reason=f"{protection_group}_reviewed_or_overridden",
+            )
+        )
+        return
+    setattr(poi, field_name, incoming_value)
+
+
+def osm_field_is_protected(poi: POI, protection_group: str) -> bool:
+    editorial = poi.editorial
+    if editorial is None:
+        return False
+    if editorial_status_is_reviewed(editorial.editorial_status):
+        return True
+    if protection_group == "title":
+        return bool(editorial.editorial_title_override)
+    if protection_group == "description":
+        return bool(editorial.editorial_description_override)
+    if protection_group == "category":
+        return bool(editorial.editorial_category_override)
+    return False
+
+
+def editorial_status_is_reviewed(status: str | None) -> bool:
+    return bool(status and status not in {"unreviewed", "needs_review"})
+
+
+def emit_canonical_overwrite_diagnostic(
+    session: Session,
+    poi: POI,
+    normalized: NormalizedPOI,
+    conflicts: list[CanonicalOverwriteConflict],
+) -> None:
+    if not conflicts:
+        return
+
+    ensure_osm_source_registry(session)
+    now = datetime.now(UTC)
+    payload = {
+        "reason": "incoming_osm_values_conflicted_with_reviewed_canonical_fields",
+        "conflicts": [
+            {
+                "field_name": conflict.field_name,
+                "existing_value": conflict.existing_value,
+                "incoming_value": conflict.incoming_value,
+                "reason": conflict.reason,
+            }
+            for conflict in conflicts
+        ],
+    }
+    diagnostic = session.scalar(
+        select(OfficialMatchDiagnostic).where(
+            OfficialMatchDiagnostic.source_id == OSM_SOURCE_NAME,
+            OfficialMatchDiagnostic.external_record_id == normalized.source_record_id,
+            OfficialMatchDiagnostic.matched_poi_id == poi.poi_id,
+            OfficialMatchDiagnostic.match_strategy == OSM_OVERWRITE_DIAGNOSTIC_STRATEGY,
+            OfficialMatchDiagnostic.status == "unreviewed",
+        )
+    )
+    if diagnostic is None:
+        diagnostic = OfficialMatchDiagnostic(
+            source_id=OSM_SOURCE_NAME,
+            region=normalized.city,
+            external_record_id=normalized.source_record_id,
+            external_name=normalized.canonical_name,
+            matched_poi_id=poi.poi_id,
+            best_candidate_name=poi.canonical_name,
+            best_similarity=None,
+            match_strategy=OSM_OVERWRITE_DIAGNOSTIC_STRATEGY,
+            status="unreviewed",
+            resolution_method=None,
+            raw_payload_json=payload,
+            created_at=now,
+            updated_at=now,
+        )
+        session.add(diagnostic)
+        return
+
+    diagnostic.region = normalized.city
+    diagnostic.external_name = normalized.canonical_name
+    diagnostic.best_candidate_name = poi.canonical_name
+    diagnostic.raw_payload_json = payload
+    diagnostic.updated_at = now
+
+
+def ensure_osm_source_registry(session: Session) -> None:
+    source = session.get(SourceRegistry, OSM_SOURCE_NAME)
+    if source is not None:
+        return
+    now = datetime.now(UTC)
+    session.add(
+        SourceRegistry(
+            source_id=OSM_SOURCE_NAME,
+            organization_name="OpenStreetMap contributors",
+            source_name="OpenStreetMap Overpass",
+            source_type="community_map",
+            trust_class="source_record",
+            base_url="https://www.openstreetmap.org",
+            license_notes="ODbL-1.0",
+            crawl_allowed=True,
+            ingest_method="overpass",
+            created_at=now,
+            updated_at=now,
+        )
+    )
 
 
 def upsert_signals(session: Session, poi: POI, tags: dict[str, Any]) -> None:

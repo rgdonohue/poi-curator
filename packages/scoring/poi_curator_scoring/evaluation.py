@@ -15,6 +15,7 @@ from poi_curator_domain.schemas import (
     RouteSuggestResponse,
     TravelMode,
 )
+from poi_curator_domain.themes import ThemeSlug
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -56,7 +57,7 @@ class RouteEvaluationCase(BaseEvaluationCase):
             destination=self.destination,
             travel_mode=self.travel_mode,
             category=cast(PublicCategory, self.category),
-            theme=self.theme,
+            theme=cast(ThemeSlug | None, self.theme),
             max_detour_meters=self.max_detour_meters,
             max_extra_minutes=self.max_extra_minutes,
             region_hint=self.region_hint,
@@ -74,7 +75,7 @@ class NearbyEvaluationCase(BaseEvaluationCase):
             center=self.center,
             travel_mode=self.travel_mode,
             category=cast(PublicCategory, self.category),
-            theme=self.theme,
+            theme=cast(ThemeSlug | None, self.theme),
             radius_meters=self.radius_meters,
             region_hint=self.region_hint,
             limit=self.limit,

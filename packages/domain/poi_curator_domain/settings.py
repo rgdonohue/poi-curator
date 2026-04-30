@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     database_url: str = "postgresql+psycopg://poi_curator:poi_curator@localhost:5432/poi_curator"
+    admin_key: str | None = None
     allow_fixture_fallback: bool = True
     default_region: str = "santa-fe"
     scoring_profile_version: str = "v0"
