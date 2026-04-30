@@ -1,14 +1,14 @@
 # Tooling and Agent Operations
 
-## Engineering Stack Recommendation
+## Current Engineering Stack
 
 ### Language and framework
 
-- Python 3.12
+- Python 3.12+ project metadata; the local reviewed environment was running Python 3.14
 - FastAPI
 - Pydantic v2
 - SQLAlchemy 2.x + GeoAlchemy2
-- `psycopg` or `asyncpg` depending on sync vs async decision
+- `psycopg`
 
 ### Spatial/data libraries
 
@@ -22,7 +22,7 @@
 
 - Typer for job commands
 - external scheduler first: cron, hosted scheduler, or CI-based scheduled runs
-- avoid embedding APScheduler into the web process in MVP
+- no embedded scheduler in the web process
 
 ### Quality and developer workflow
 
@@ -32,6 +32,9 @@
 - `mypy`
 - `pre-commit`
 - `.env` management plus a typed settings layer
+
+As of the latest repository review, tests, lint, and typecheck are configured but not all clean.
+Do not describe the repository as fully green without rerunning the commands locally.
 
 ### Optional later additions
 
@@ -64,19 +67,26 @@ This layout maps cleanly onto parallel agent work and keeps the route-scoring co
 ### Minimum setup
 
 - Docker Compose for Postgres/PostGIS
-- `make dev` or equivalent bootstrap
-- seed fixture loader
+- `make install`
+- Alembic migrations through `make migrate`
 - local `.env.example`
 
-### Suggested commands to standardize early
+### Standard commands
 
-- `make dev`
+- `make db-up`
+- `make db-down`
+- `make migrate`
+- `make api`
 - `make test`
 - `make lint`
 - `make typecheck`
 - `make ingest-osm`
 - `make enrich`
-- `make score-fixtures`
+- `make check-suites`
+- `.venv/bin/python scripts/run_check_suite.py --suite core-product`
+
+Database-backed commands need PostGIS running on `localhost:5432` unless
+`POI_CURATOR_DATABASE_URL` is overridden.
 
 ## CI/CD Recommendation
 
@@ -89,6 +99,9 @@ Run on every PR:
 - unit tests
 - integration tests against ephemeral PostGIS
 - golden-route regression tests
+
+This is still a recommendation. The local project already has the command surface and tests, but
+the current working state needs cleanup before these checks can serve as a clean release gate.
 
 ### Continuous delivery
 
@@ -122,19 +135,21 @@ For MVP keep deployment simple:
 
 The project needs evaluation infrastructure almost as much as it needs source connectors.
 
-### Add early
+### Implemented now
 
 - golden-route fixtures
-- scoring profile versioning
-- before/after score diff reports
-- reviewer outcome capture for surfaced results
+- grouped check suites through `scripts/run_check_suite.py`
+- per-suite JSON and Markdown reports under `reports/check_runs/`
+- route and nearby cases over `data/fixtures/eval_santa_fe.json`
+- expectation-based pass/fail checks
 
-### Useful scripts
+### Still useful
 
-- `scripts/build_golden_routes.py`
 - `scripts/compare_scoring_profiles.py`
 - `scripts/export_review_queue.py`
 - `scripts/import_editorial_decisions.py`
+- reviewer outcome capture for surfaced results
+- scoring profile diff reports
 
 ## MCP Recommendations
 
@@ -201,6 +216,8 @@ Use agents for bounded, disjoint tasks. Do not parallelize coupled edits in the 
 - `packages/scoring` and `tests/golden_routes`: scoring worker
 - `apps/api` and `packages/domain`: platform worker
 - `apps/admin` and editorial APIs: editorial tooling worker
+- `docs`, `reports`, and `scripts`: documentation/export worker, with care not to overwrite
+  generated handoff artifacts unless regeneration is the explicit task
 
 ## Logging and Diagnostics Standards
 
@@ -230,6 +247,13 @@ Keep four document classes current:
 - runbooks
 - scoring profile change logs
 
+Also keep `AGENTS.md` current. It is the shortest source of operational guidance for future coding
+agents and should reflect actual command behavior, DB requirements, and current limitations.
+
+Keep `docs/DATA_QUALITY_GOVERNANCE.md` current as the canonical governance layer. Any workflow
+that creates exports, generated descriptions, or source-derived evidence should state how it
+preserves provenance, draft status, and review state.
+
 Scoring changes should be accompanied by:
 
 - rationale
@@ -237,7 +261,15 @@ Scoring changes should be accompanied by:
 - golden-route deltas
 - reviewer notes if any
 
-## Recommended First Setup Checklist
+Export or description-generation changes should be accompanied by:
+
+- whether generated text is present
+- how generated text is labeled as draft or approved
+- how claim basis is represented
+- whether fixture-overlay rows are included
+- source coverage or bias caveats affected by the change
+
+## Historical First Setup Checklist
 
 1. Create repo scaffold and `docs/planning`.
 2. Add Docker Compose for PostGIS.

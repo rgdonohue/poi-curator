@@ -11,6 +11,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from poi_curator_scoring.evaluation import (
+    CombinedSuggestBackend,
     EvaluatedResult,
     EvaluationCase,
     EvaluationCaseResult,
@@ -44,6 +45,7 @@ class CheckRun(BaseModel):
     matched_expected_names: list[str] = Field(default_factory=list)
     violated_forbidden_names: list[str] = Field(default_factory=list)
     top_result_names: list[str] = Field(default_factory=list)
+    result_source: str | None = None
     soft_warnings: list[str] = Field(default_factory=list)
     notes: list[str] = Field(default_factory=list)
     results: list[EvaluatedResult] = Field(default_factory=list)
@@ -52,6 +54,9 @@ class CheckRun(BaseModel):
 class CheckReport(BaseModel):
     generated_at: datetime
     fixtures_path: str | None = None
+    backend_mode: str | None = None
+    fixture_fallback_allowed: bool | None = None
+    database_target: str | None = None
     run_count: int
     passed_count: int | None = None
     failed_count: int | None = None
@@ -151,7 +156,7 @@ def build_inline_route_case(
 
 
 def run_check_case(
-    backend: object,
+    backend: CombinedSuggestBackend,
     db: Session,
     case: EvaluationCase,
     *,
@@ -159,6 +164,7 @@ def run_check_case(
 ) -> CheckRun:
     result = evaluate_case(backend, db, case)
     return _run_from_evaluation_result(
+        backend=backend,
         case=case,
         result=result,
         expectation_based=expectation_based,
@@ -169,11 +175,17 @@ def build_report(
     runs: Sequence[CheckRun],
     *,
     fixtures_path: Path | None = None,
+    backend_mode: str | None = None,
+    fixture_fallback_allowed: bool | None = None,
+    database_target: str | None = None,
 ) -> CheckReport:
     expectation_runs = [run for run in runs if run.passed is not None]
     return CheckReport(
         generated_at=datetime.now(UTC),
         fixtures_path=str(fixtures_path) if fixtures_path is not None else None,
+        backend_mode=backend_mode,
+        fixture_fallback_allowed=fixture_fallback_allowed,
+        database_target=database_target,
         run_count=len(runs),
         passed_count=sum(1 for run in expectation_runs if run.passed) if expectation_runs else None,
         failed_count=(
@@ -223,6 +235,8 @@ def render_terminal_run(run: CheckRun, *, verbose: bool = False) -> str:
         meta.append(f"theme={run.theme}")
     if run.region_hint is not None:
         meta.append(f"region_hint={run.region_hint}")
+    if run.result_source is not None:
+        meta.append(f"result_source={run.result_source}")
 
     lines = [
         f"{status} {run.case_id} · {run.label}",
@@ -269,6 +283,12 @@ def render_report_markdown(report: CheckReport, *, verbose: bool = False) -> str
     ]
     if report.fixtures_path is not None:
         lines.append(f"- Fixtures: {report.fixtures_path}")
+    if report.backend_mode is not None:
+        lines.append(f"- Backend mode: {report.backend_mode}")
+    if report.fixture_fallback_allowed is not None:
+        lines.append(f"- Fixture fallback allowed: {report.fixture_fallback_allowed}")
+    if report.database_target is not None:
+        lines.append(f"- Database target: {report.database_target}")
     if report.passed_count is not None and report.failed_count is not None:
         lines.append(f"- Passed: {report.passed_count}")
         lines.append(f"- Failed: {report.failed_count}")
@@ -286,6 +306,8 @@ def render_report_markdown(report: CheckReport, *, verbose: bool = False) -> str
         lines.append(f"- Travel mode: {run.travel_mode}")
         if run.theme is not None:
             lines.append(f"- Theme: {run.theme}")
+        if run.result_source is not None:
+            lines.append(f"- Result source: {run.result_source}")
         lines.append(f"- Query: {_format_query_summary(run.query_summary)}")
         lines.append(f"- Result count: {run.result_count}")
         for warning in run.soft_warnings:
@@ -376,6 +398,7 @@ def write_review_files(
 
 def _run_from_evaluation_result(
     *,
+    backend: object,
     case: EvaluationCase,
     result: EvaluationCaseResult,
     expectation_based: bool,
@@ -398,6 +421,7 @@ def _run_from_evaluation_result(
         matched_expected_names=result.matched_expected_names,
         violated_forbidden_names=result.violated_forbidden_names,
         top_result_names=result.top_result_names,
+        result_source=_result_source_for_backend(backend),
         soft_warnings=result.soft_warnings,
         notes=result.notes,
         results=result.results,
@@ -409,6 +433,13 @@ def _slugify_case_id(prefix: str, label: str | None) -> str:
         return prefix
     slug = re.sub(r"[^a-z0-9]+", "-", label.casefold()).strip("-")
     return f"{prefix}-{slug}" if slug else prefix
+
+
+def _result_source_for_backend(backend: object) -> str | None:
+    source = getattr(backend, "last_query_source", None)
+    if source is None:
+        return None
+    return str(source)
 
 
 def _format_full_score_breakdown(score_breakdown: dict[str, float]) -> str:

@@ -1,6 +1,8 @@
+import logging
 from functools import lru_cache
 from typing import Protocol
 
+from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
     AdminAliasFromDiagnosticRequest,
     AdminAliasMutationResponse,
@@ -23,26 +25,26 @@ from poi_curator_domain.schemas import (
     RouteSuggestRequest,
     RouteSuggestResponse,
 )
+from poi_curator_domain.settings import get_settings
 from poi_curator_editorial import service as editorial_service
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from poi_curator_scoring import engine, query_service
 
+logger = logging.getLogger(__name__)
+
 
 class ScoringBackend(Protocol):
-    def suggest_places(self, db: Session, payload: RouteSuggestRequest) -> RouteSuggestResponse:
-        ...
+    def suggest_places(self, db: Session, payload: RouteSuggestRequest) -> RouteSuggestResponse: ...
 
     def suggest_nearby_places(
         self,
         db: Session,
         payload: NearbySuggestRequest,
-    ) -> NearbySuggestResponse:
-        ...
+    ) -> NearbySuggestResponse: ...
 
-    def get_poi_detail(self, db: Session, poi_id: str) -> POIDetailResponse | None:
-        ...
+    def get_poi_detail(self, db: Session, poi_id: str) -> POIDetailResponse | None: ...
 
     def get_admin_queue(
         self,
@@ -50,15 +52,13 @@ class ScoringBackend(Protocol):
         *,
         status: str,
         city: str | None,
-    ) -> list[AdminPOIItem]:
-        ...
+    ) -> list[AdminPOIItem]: ...
 
     def get_admin_poi_evidence(
         self,
         db: Session,
         poi_id: str,
-    ) -> AdminPOIEvidenceResponse | None:
-        ...
+    ) -> AdminPOIEvidenceResponse | None: ...
 
     def get_admin_match_diagnostics(
         self,
@@ -68,24 +68,21 @@ class ScoringBackend(Protocol):
         source_id: str | None,
         status: str,
         limit: int,
-    ) -> list[AdminMatchDiagnosticItem]:
-        ...
+    ) -> list[AdminMatchDiagnosticItem]: ...
 
     def patch_admin_poi(
         self,
         db: Session,
         poi_id: str,
         payload: AdminPOIPatchRequest,
-    ) -> AdminPOIPatchResponse | None:
-        ...
+    ) -> AdminPOIPatchResponse | None: ...
 
     def get_admin_theme_summaries(
         self,
         db: Session,
         *,
         city: str | None,
-    ) -> list[AdminThemeSummaryItem]:
-        ...
+    ) -> list[AdminThemeSummaryItem]: ...
 
     def get_admin_theme_memberships(
         self,
@@ -97,8 +94,7 @@ class ScoringBackend(Protocol):
         review_state: str | None,
         editorial_decision: str | None,
         limit: int,
-    ) -> list[AdminThemeMembershipQueueItem]:
-        ...
+    ) -> list[AdminThemeMembershipQueueItem]: ...
 
     def get_admin_theme_membership_detail(
         self,
@@ -106,8 +102,7 @@ class ScoringBackend(Protocol):
         *,
         poi_id: str,
         theme_slug: str,
-    ) -> AdminThemeMembershipDetailResponse | None:
-        ...
+    ) -> AdminThemeMembershipDetailResponse | None: ...
 
     def review_theme_membership(
         self,
@@ -116,40 +111,35 @@ class ScoringBackend(Protocol):
         poi_id: str,
         theme_slug: str,
         payload: AdminThemeReviewRequest,
-    ) -> AdminThemeReviewResponse | None:
-        ...
+    ) -> AdminThemeReviewResponse | None: ...
 
     def resolve_match_diagnostic(
         self,
         db: Session,
         diagnostic_id: int,
         payload: AdminResolveDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        ...
+    ) -> AdminMatchDiagnosticItem | None: ...
 
     def create_alias_from_diagnostic(
         self,
         db: Session,
         diagnostic_id: int,
         payload: AdminAliasFromDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        ...
+    ) -> AdminMatchDiagnosticItem | None: ...
 
     def suppress_match_diagnostic(
         self,
         db: Session,
         diagnostic_id: int,
         payload: AdminSuppressDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        ...
+    ) -> AdminMatchDiagnosticItem | None: ...
 
     def add_poi_alias(
         self,
         db: Session,
         poi_id: str,
         payload: AdminCreateAliasRequest,
-    ) -> AdminAliasMutationResponse | None:
-        ...
+    ) -> AdminAliasMutationResponse | None: ...
 
 
 class FixtureScoringBackend:
@@ -302,16 +292,21 @@ class FixtureScoringBackend:
 class HybridScoringBackend(FixtureScoringBackend):
     def __init__(self, *, allow_fixture_fallback: bool = True) -> None:
         self.allow_fixture_fallback = allow_fixture_fallback
+        self.last_query_source: str | None = None
 
     def suggest_places(self, db: Session, payload: RouteSuggestRequest) -> RouteSuggestResponse:
         try:
             response = query_service.suggest_places(db, payload)
         except SQLAlchemyError:
             if not self.allow_fixture_fallback:
+                self._set_last_query_source("database_error")
                 raise
+            self._set_last_query_source("fixture_fallback_db_error")
             return super().suggest_places(db, payload)
         if response.results or not self.allow_fixture_fallback:
+            self._set_last_query_source("database" if response.results else "database_empty")
             return response
+        self._set_last_query_source("fixture_fallback_empty_db")
         return super().suggest_places(db, payload)
 
     def suggest_nearby_places(
@@ -323,10 +318,14 @@ class HybridScoringBackend(FixtureScoringBackend):
             response = query_service.suggest_nearby_places(db, payload)
         except SQLAlchemyError:
             if not self.allow_fixture_fallback:
+                self._set_last_query_source("database_error")
                 raise
+            self._set_last_query_source("fixture_fallback_db_error")
             return super().suggest_nearby_places(db, payload)
         if response.results or not self.allow_fixture_fallback:
+            self._set_last_query_source("database" if response.results else "database_empty")
             return response
+        self._set_last_query_source("fixture_fallback_empty_db")
         return super().suggest_nearby_places(db, payload)
 
     def get_poi_detail(self, db: Session, poi_id: str) -> POIDetailResponse | None:
@@ -612,11 +611,23 @@ class HybridScoringBackend(FixtureScoringBackend):
             return response
         return super().add_poi_alias(db, poi_id, payload)
 
+    def _set_last_query_source(self, source: str) -> None:
+        self.last_query_source = source
+        if source.startswith("fixture_fallback"):
+            log_event(
+                logger,
+                "fixture_fallback_used",
+                backend_mode="hybrid",
+                source=source,
+                allow_fixture_fallback=self.allow_fixture_fallback,
+            )
+
 
 @lru_cache
 def get_default_scoring_backend() -> ScoringBackend:
-    return HybridScoringBackend()
+    settings = get_settings()
+    return HybridScoringBackend(allow_fixture_fallback=settings.allow_fixture_fallback)
 
 
-def get_database_scoring_backend() -> ScoringBackend:
-    return HybridScoringBackend(allow_fixture_fallback=False)
+def get_database_scoring_backend(*, allow_fixture_fallback: bool = False) -> ScoringBackend:
+    return HybridScoringBackend(allow_fixture_fallback=allow_fixture_fallback)

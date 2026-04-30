@@ -8,12 +8,19 @@ The system is designed to answer a narrow question:
 
 > What stop along or near this route would help a traveler read the landscape more deeply?
 
+The methodology is governed by
+[DATA_QUALITY_GOVERNANCE.md](/Users/richard/Documents/projects/poi-curator/docs/DATA_QUALITY_GOVERNANCE.md).
+That document defines the difference between source data, canonical data, evidence, derived
+signals, editorial interpretation, and generated drafts. Those distinctions are part of the method,
+not implementation detail.
+
 That posture drives several core choices:
 
 - The system is region-first, not globally generic. Santa Fe is the current reference geography.
 - Discovery is source-aware and provenance-preserving.
 - Ranking is deterministic, rule-based, and explainable.
 - Editorial review is explicit rather than hidden inside score tweaks.
+- Generated drafts are kept separate from canonical data until reviewed.
 - The runtime API stays thin; heavy work happens in ingestion and enrichment jobs.
 
 ## Methodological Principles
@@ -37,14 +44,25 @@ Raw source records, canonical POIs, evidence rows, and editorial decisions are s
 - identity and description evidence
 - official corroboration
 - editorial overrides
+- generated drafts that are not yet approved canonical copy
 
 ### 4. Deterministic scoring with diagnostics
 
 The current ranking methodology uses explicit weights, guardrails, and factor breakdowns. Every surfaced candidate can be explained in terms of route fit, category fit, corroboration, and interpretive signals.
 
+Scores such as `quality_score`, `base_significance_score`, and `interpretive_value_score` are
+heuristic review and ranking aids. They are not objective measurements of cultural worth,
+historical importance, or community meaning.
+
 ### 5. Human review remains first-class
 
 Editors can suppress, alias, reclassify, boost, or theme-review a candidate without erasing the underlying machine-generated record of how it was produced.
+
+### 6. No synthetic corpus data
+
+Synthetic data is acceptable only for tests, fixtures, mocks, and clearly labeled drafts. It should
+not enter source evidence, canonical POI records, or production-like frontend exports as if it were
+real cultural or historical data.
 
 ## Current System Shape
 
@@ -58,6 +76,39 @@ The built system consists of five implemented layers plus one lightweight UI/tes
 6. API plus local map test UI
 
 There is also a full evaluation layer used to regression-test ranking behavior.
+
+## Current Runtime Contract and Limits
+
+The public runtime contract is intentionally small:
+
+- route suggestions from a supplied route `LineString`
+- nearby suggestions from a supplied center point
+- point suggestions as a compatibility wrapper around nearby suggestions
+- POI detail responses with provenance, evidence, themes, badges, and extended place context
+- config and category metadata for clients
+
+This backend does not compute the baseline route or the final route-through-stop geometry. It
+estimates route detour and nearby access costs from projected geometric distance. Detour or another
+frontend/routing layer should still use a routing provider for actual route drawing and final travel
+time.
+
+The current scoring backend is hybrid. It tries the DB-backed query service first and falls back to
+fixture scoring when database access fails or no DB results are available. That keeps local API tests
+and exploratory UI work useful, but fresh DB-backed QA still requires PostGIS to be running.
+
+## Current Verification State
+
+The repository has saved passing QA reports under `reports/check_runs/`, including the
+`20260408T_history_validation_final` run with 20 passing case runs. Those are historical artifacts,
+not proof of the current working tree.
+
+Recent local project reviews have found these recurring verification constraints:
+
+- DB-backed check suites could not run without PostGIS listening on `localhost:5432`
+- ruff reported formatting/import/line-length issues, especially outside the current work scope
+- mypy reported theme `Literal` typing issues and a few test-helper type mismatches
+
+Resolve those before treating the branch as release-ready.
 
 ## Data Model
 
@@ -185,6 +236,48 @@ Short descriptions are chosen in this order:
 3. fallback template by internal subtype
 
 Descriptions are treated as low quality if they are too short, obviously maintenance-like, or look like mapper notes rather than traveler-facing interpretive copy.
+
+### Temporary frontend description drafting
+
+For the current frontend seed export, the repository also supports a separate description-drafting pass that does not overwrite the canonical POI table. This is a practical bridge while fuller editorial review is still catching up with the corpus.
+
+These descriptions are generated drafts. They are not source data, not canonical POI data, and not
+evidence. Their only valid role before review is to provide a labeled editorial review surface for
+possible frontend handoff.
+
+The temporary drafting method is deliberately evidence-weighted and conservative:
+
+- start from the merged frontend seed CSV
+- use DB-backed POIs where available
+- pull current raw source tags, preferred aliases, query-active themes, and linked evidence rows
+- prefer official or quasi-official corroboration in this order:
+  - state + national register evidence
+  - one of the official register sources
+  - city GIS district, building-status, museum, worship, public-art, plaza, or railyard evidence
+  - specific source tags such as `description`, `old_name`, `artist_name`, or `was:industrial`
+  - category-level fallback language only when stronger evidence is absent
+
+The drafting pass outputs:
+
+- a shorter map description
+- a fuller card description
+- a confidence label
+- a basis string showing which evidence types informed the text
+
+The current deterministic implementation for that pass lives in
+[generate_frontend_seed_descriptions.py](/Users/richard/Documents/projects/poi-curator/scripts/generate_frontend_seed_descriptions.py).
+For the present frontend handoff it reads the merged seed CSV plus a DB-exported context CSV and writes
+[query_capable_pois_frontend_seed_described_v1.csv](/Users/richard/Documents/projects/poi-curator/reports/query_capable_pois_frontend_seed_described_v1.csv).
+
+Methodological guardrails for this temporary pass:
+
+- do not invent dates, named actors, or events
+- do not speak for living communities without explicit evidence
+- avoid romanticized tourism language
+- treat register and GIS evidence as corroboration of status or context, not license for embellished narrative
+- keep generated text outside the canonical POI table until reviewed
+
+This means the frontend can use materially better copy than the generic subtype templates without pretending the text is already final editorial truth.
 
 ### Initial scoring hints
 

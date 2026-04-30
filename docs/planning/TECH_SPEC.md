@@ -2,20 +2,29 @@
 
 ## System Overview
 
-The service will be a standalone FastAPI application backed by Postgres + PostGIS, with source-specific ingestion jobs and a route-aware scoring engine.
+The service is a standalone FastAPI application backed by Postgres + PostGIS, with
+source-specific ingestion/enrichment jobs and a route-aware scoring engine.
 
 Core architectural principle:
 
 - scheduled jobs perform slow, messy, source-heavy work
 - runtime requests perform fast, bounded, route-aware ranking on already normalized data
 
-## Recommended Repository Shape
+The current implementation also includes fixture-backed fallback scoring for tests and local
+resilience, a MapLibre map tester, grouped evaluation reports, and temporary frontend seed export
+artifacts for Detour.
+
+Data-quality governance is part of the technical contract. See
+`docs/DATA_QUALITY_GOVERNANCE.md` for required distinctions between source data, canonical data,
+evidence, derived signals, editorial interpretation, and generated drafts.
+
+## Repository Shape
 
 ```text
 poi-curator/
   apps/
     api/
-    admin/                    # optional lightweight review UI later
+    admin/                    # reserved for a lightweight review UI
   packages/
     domain/                   # models, enums, taxonomy, contracts
     ingestion/                # source adapters and normalization
@@ -53,7 +62,7 @@ flowchart LR
 
 ## Core Components
 
-### 1. Ingestion jobs
+### 1. Ingestion Jobs
 
 Responsibilities:
 
@@ -65,13 +74,13 @@ Responsibilities:
 Initial source adapters:
 
 - OSM / Overpass
-- NRHP / SHPO import adapter
+- NRHP / New Mexico HPD import paths are implemented in enrichment as evidence sources
 
 Design rule:
 
 Each source adapter writes to `poi_source_raw` or adjacent raw staging tables first. No adapter writes directly into `poi`.
 
-### 2. Normalization pipeline
+### 2. Normalization Pipeline
 
 Responsibilities:
 
@@ -87,7 +96,7 @@ Key logic:
 - preserve source-specific tags in a summarized JSON field
 - maintain multi-membership across internal categories
 
-### 3. Enrichment pipeline
+### 3. Enrichment Pipeline
 
 Responsibilities:
 
@@ -104,7 +113,11 @@ Matching strategy order:
 
 The pipeline must record confidence and never silently overwrite an existing, higher-confidence identity link.
 
-### 4. Scoring engine
+Implemented evidence sources include Wikidata, Santa Fe City GIS layers, NRHP listed properties,
+and the New Mexico HPD register workbook. Unmatched or low-confidence official records should
+produce diagnostics rather than silent guesses.
+
+### 4. Scoring Engine
 
 Responsibilities:
 
@@ -112,11 +125,23 @@ Responsibilities:
 - compute route fit, significance, interpretive value, quality, editorial contribution, and penalties
 - emit factor breakdowns and explanation phrases
 
-Implementation rule:
+Current implementation:
 
-Start with weighted rules and versioned scoring configs. No ML ranking in MVP.
+- deterministic weighted rules
+- DB-backed route and nearby prefilters
+- geometric distance/access estimates using Shapely/PyProj
+- category match types: `primary`, `secondary`, `mixed`
+- score breakdown fields returned in API responses
+- water and rail theme bonuses/filters
+- fixture fallback through `HybridScoringBackend`
 
-### 5. API layer
+No ML ranking is used.
+
+Scoring fields are heuristic ranking and review aids. They must not be documented or exposed as
+objective measurements of cultural value. If an app-facing export includes scores, it should also
+include enough provenance and basis fields for review.
+
+### 5. API Layer
 
 Responsibilities:
 
@@ -125,7 +150,20 @@ Responsibilities:
 - expose admin curation and ingestion status endpoints
 - avoid embedding complex business logic directly in routers
 
-### 6. Editorial layer
+Current public endpoints:
+
+- `GET /v1/health`
+- `GET /v1/config`
+- `GET /v1/categories`
+- `POST /v1/route/suggest`
+- `POST /v1/nearby/suggest`
+- `POST /v1/point/suggest`
+- `GET /v1/poi/{poi_id}`
+
+Current admin endpoints cover POI review queues, POI patching, evidence views, match diagnostics,
+aliases, theme summaries, theme membership detail, theme review, and scaffold ingest status.
+
+### 6. Editorial Layer
 
 Responsibilities:
 
@@ -136,6 +174,12 @@ Responsibilities:
 - merge decisions and review notes
 
 The editorial layer must be queryable and auditable.
+
+The current admin UI directory is only a placeholder. Editorial capabilities currently live in
+database tables, API endpoints, and exported review artifacts.
+
+Generated descriptions may become canonical only through editorial approval. The schema and exports
+should preserve draft/review status wherever generated descriptions are present.
 
 ## Data Storage
 
@@ -174,6 +218,7 @@ Suggested fields:
 - `is_current`
 - `license`
 - `ingest_run_id`
+- `canonical_poi_id`
 
 Indexes:
 
@@ -209,8 +254,8 @@ Suggested fields:
 - `scenic_flag`
 - `infrastructure_flag`
 - `food_identity_flag`
-- `walk_relevance`
-- `drive_relevance`
+- `walk_affinity_hint`
+- `drive_affinity_hint`
 - `base_significance_score`
 - `quality_score`
 - `review_status`
@@ -235,6 +280,9 @@ Suggested fields:
 - `has_wikidata`
 - `has_wikipedia`
 - `has_official_heritage_match`
+- `official_corroboration_score`
+- `district_membership_score`
+- `institutional_identity_score`
 - `osm_tag_richness`
 - `description_quality`
 - `entity_type_confidence`
@@ -261,13 +309,39 @@ Suggested fields:
 - `last_reviewed_at`
 - `reviewed_by`
 
-### Recommended supporting tables
+### Supporting Implemented Tables
 
-- `poi_source_link`: many-to-one mapping from canonical POIs to raw source rows
-- `ingest_run`: run metadata, counts, duration, status, error summary
+- `source_registry`: source metadata, trust class, ingest method, license/access notes
+- `poi_evidence`: evidence rows linked to POIs and sources
+- `poi_alias`: alternate names used for matching and editorial correction
+- `official_match_diagnostic`: unresolved/reviewed official-source match decisions
+- `theme_definition`: theme metadata and public query activation
+- `poi_theme_membership`: automated theme assignments
+- `poi_theme_membership_evidence`: evidence supporting automated theme assignment
+- `poi_theme_editorial`: editorial force-include/force-exclude and review metadata
+
+### Additional Future Table Candidates
+
+- `poi_source_link`: many-to-one mapping if `poi_source_raw.canonical_poi_id` becomes too limiting
 - `poi_merge_log`: duplicate merges and replacement mapping
 - `scoring_profile`: weight-set versions by mode and category
 - `route_query_log`: optional internal diagnostics for evaluation and QA
+
+### Export Metadata Requirements
+
+Frontend or review exports should preserve enough metadata to audit source basis and generated
+content status. Recommended fields:
+
+- `record_origin`
+- `source_basis`
+- `evidence_strength`
+- `description_status`
+- `description_method`
+- `description_review_status`
+- `claim_basis`
+- `risk_flags`
+
+Exports that mix DB-backed and fixture-overlay records must label the origin of each row.
 
 ## Spatial Query Strategy
 

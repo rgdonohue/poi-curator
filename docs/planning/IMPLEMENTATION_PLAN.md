@@ -1,5 +1,39 @@
 # Implementation Plan
 
+## Current Status Snapshot
+
+The original phase plan below is still useful as the product spine, but the repository has advanced
+past the scaffold stage.
+
+Implemented now:
+
+- local FastAPI service with public and admin routers
+- Postgres/PostGIS schema and Alembic migrations through theme/editorial/history-anchor support
+- OSM/Overpass ingestion and canonical POI normalization
+- Wikidata, Santa Fe City GIS, NRHP, and New Mexico HPD enrichment/evidence pipelines
+- deterministic DB-backed route and nearby scoring, with fixture fallback
+- water and rail query themes plus inactive public-memory modeling
+- editorial APIs for review state, aliases, match diagnostics, and theme membership decisions
+- check-suite runner with saved Santa Fe validation reports
+- local MapLibre map tester at `/map-test`
+- frontend seed export and temporary description-enrichment workflow
+
+Current hardening needs:
+
+- restore clean pytest/ruff/mypy status
+- run DB-backed check suites against a live local PostGIS database before claiming fresh validation
+- keep generated frontend description artifacts separate from canonical POI truth until reviewed
+- decide the frontend integration contract for live API responses versus exported seed data
+- build a focused admin UI only where API/export review loops become too slow
+
+Governance hardening needs:
+
+- implement the data classes and synthetic-data policy in `docs/DATA_QUALITY_GOVERNANCE.md`
+- add export-level provenance and draft/review-status fields where missing
+- expose or disable fixture fallback in production-like runs
+- add checks that claims in frontend handoff descriptions have visible basis metadata
+- document source-specific coverage and bias caveats when adding or changing source adapters
+
 ## Delivery Strategy
 
 Build the service as a sequence of narrow, testable layers. Do not try to solve discovery, enrichment, ranking, editorial tooling, and app integration simultaneously.
@@ -12,6 +46,8 @@ The implementation program should be organized across four workstreams:
 - editorial operations and integration
 
 ## Phase 0: Foundation
+
+Status: implemented.
 
 ### Objective
 
@@ -40,6 +76,8 @@ Stand up the repo, database, core schema, and basic fixtures so later work is gr
 
 ## Phase 1: OSM Discovery and Canonicalization
 
+Status: implemented for the Santa Fe reference corpus; continue tuning taxonomy and false-positive filters as review findings accumulate.
+
 ### Objective
 
 Build candidate discovery for Santa Fe and normalize it into canonical POIs.
@@ -67,6 +105,8 @@ Build candidate discovery for Santa Fe and normalize it into canonical POIs.
 
 ## Phase 2: Enrichment Layer
 
+Status: implemented for Wikidata, Santa Fe City GIS, NRHP, and New Mexico HPD evidence paths; continue improving match diagnostics and source-specific coverage.
+
 ### Objective
 
 Improve identity, type confidence, and interpretive context without pretending enrichment solves editorial judgment.
@@ -92,6 +132,8 @@ Improve identity, type confidence, and interpretive context without pretending e
 - overtrusting article existence as significance
 
 ## Phase 3: Route-Aware Ranking
+
+Status: implemented with deterministic DB-backed route and nearby scoring, score breakdowns, check suites, and fixture fallback. Detour estimates are geometric, not network-routed.
 
 ### Objective
 
@@ -120,6 +162,8 @@ Turn the data spine into a useful service by ranking candidates against real rou
 
 ## Phase 4: Editorial Workflow
 
+Status: partially implemented through admin API endpoints, editorial tables, aliases, diagnostics, and theme review. A dedicated admin UI is not yet built.
+
 ### Objective
 
 Create a low-friction way for humans to shape the corpus and correct the ranking.
@@ -146,6 +190,8 @@ Create a low-friction way for humans to shape the corpus and correct the ranking
 
 ## Phase 5: App Integration
 
+Status: partially implemented through stable public API contracts, `/map-test`, and frontend seed exports. Full Detour integration still needs a deliberate handoff contract.
+
 ### Objective
 
 Integrate the service into the main app without exposing unstable internals.
@@ -155,6 +201,7 @@ Integrate the service into the main app without exposing unstable internals.
 - stable app-facing contract
 - replacement path for static `places.ts` or equivalent app fixtures
 - badges and explanation text integrated into UI
+- provenance, record-origin, description-status, and claim-basis fields in handoff artifacts
 - feature-flagged rollout
 - feedback loop from app usage to editorial review queue
 
@@ -163,6 +210,8 @@ Integrate the service into the main app without exposing unstable internals.
 - app integration depends only on documented API fields
 - service can be disabled or rolled back without breaking the app
 - user-visible copy remains concise and interpretable
+- no generated draft description is treated as approved canonical copy
+- fixture-overlay rows are visibly labeled or excluded from production-like exports
 
 ### Risks
 
@@ -171,6 +220,8 @@ Integrate the service into the main app without exposing unstable internals.
 - too-early expansion beyond Santa Fe
 
 ## Phase 6: Stabilization and Second-City Readiness
+
+Status: not started. Do not generalize until Santa Fe verification, editorial workflow, and integration constraints are stable.
 
 ### Objective
 
@@ -201,7 +252,7 @@ Decide whether the service is ready to generalize.
 
 If any step is skipped, later layers will accumulate false confidence.
 
-## First 30/60/90 Days
+## Historical First 30/60/90 Days
 
 ### First 30 days
 

@@ -147,6 +147,15 @@ def render_suite_index_markdown(
         f"- Failed: {total_failed}",
         "",
     ]
+    if suite_runs:
+        first_report = suite_runs[0].report
+        if first_report.backend_mode is not None:
+            lines.append(f"- Backend mode: {first_report.backend_mode}")
+        if first_report.fixture_fallback_allowed is not None:
+            lines.append(f"- Fixture fallback allowed: {first_report.fixture_fallback_allowed}")
+        if first_report.database_target is not None:
+            lines.append(f"- Database target: {first_report.database_target}")
+        lines.append("")
 
     for run in suite_runs:
         lines.append(f"## {run.suite.name}")

@@ -15,6 +15,7 @@ class Settings(BaseSettings):
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     database_url: str = "postgresql+psycopg://poi_curator:poi_curator@localhost:5432/poi_curator"
+    allow_fixture_fallback: bool = True
     default_region: str = "santa-fe"
     scoring_profile_version: str = "v0"
     overpass_url: str = "https://overpass-api.de/api/interpreter"
@@ -22,7 +23,9 @@ class Settings(BaseSettings):
     overpass_timeout_seconds: int = 60
     wikidata_api_url: str = "https://www.wikidata.org/w/api.php"
     wikidata_timeout_seconds: int = 30
-    city_gis_mapserver_url: str = "https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer"
+    city_gis_mapserver_url: str = (
+        "https://gis.santafenm.gov/server/rest/services/Public_Viewer/MapServer"
+    )
     city_gis_timeout_seconds: int = 45
     nrhp_listed_csv_url: str = (
         "https://www.nps.gov/common/uploads/sortable_dataset/nationalregister/"

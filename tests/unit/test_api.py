@@ -27,7 +27,8 @@ def test_map_test_page_is_served() -> None:
 
     assert response.status_code == 200
     assert "text/html" in response.headers["content-type"]
-    assert "POI Curator Map Test" in response.text
+    assert "poi-curator" in response.text
+    assert "map-test" in response.text
 
 
 def test_route_suggest_endpoint() -> None:

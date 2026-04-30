@@ -24,6 +24,10 @@ The service exists as its own backend because the difficult problem is not routi
 4. Prefer diagnostics over mystique. Every surfaced place should be explainable.
 5. Optimize for interpretive value under detour budgets, not generic popularity.
 6. Preserve ambiguity in the data model even if the UI shows a single primary reading.
+7. Treat data quality, provenance, and source transparency as product requirements, not internal
+   implementation details.
+8. Keep generated drafts and synthetic fixtures out of canonical corpus data unless explicitly
+   reviewed and labeled.
 
 ## Users
 
@@ -88,6 +92,10 @@ An app developer integrating route suggestions through a stable API without inhe
 3. Enrichment should improve identity, type confidence, and interpretive context, not replace editorial review.
 4. Source trust should be differentiated:
    OSM for existence and geometry, Wikidata for identity and typing, Wikipedia for readable context, official heritage data for formal significance.
+5. Derived scores and signals must be documented as heuristics, not objective measures of cultural value.
+6. Generated descriptions must remain labeled drafts until human review approves them.
+7. Exports must label record origin, source basis, description status, and fixture-overlay rows.
+8. Source coverage gaps and official-recognition bias must be documented instead of hidden.
 
 ### Editorial requirements
 
@@ -95,6 +103,9 @@ An app developer integrating route suggestions through a stable API without inhe
 2. Editors must be able to rewrite descriptions to avoid romanticized or generic prose.
 3. Featured and city-pack curation must be stored explicitly, not hidden in code.
 4. Editorial changes must be auditable.
+5. Culturally sensitive approvals, suppressions, force-includes, and force-excludes should preserve
+   reviewer notes.
+6. Generated descriptions should not become canonical copy without explicit approval.
 
 ## User Experience Requirements
 
@@ -162,6 +173,9 @@ Santa Fe urban area plus the immediate regional landscape. The MVP should prove 
 - Maintain golden-route evaluation fixtures before changing scoring weights.
 - Keep source-specific trust signals separate from final canonical fields.
 - Require score diagnostics for both positive and negative decisions.
+- Enforce the governance rules in `docs/DATA_QUALITY_GOVERNANCE.md` for source data, evidence,
+  derived signals, generated drafts, and exports.
+- Label official-source evidence as documentation support, not proof of greater importance.
 - Expand to a second city only after Santa Fe review workflows and evaluation stabilize.
 
 ## Open Product Questions

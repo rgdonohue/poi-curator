@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 
 from poi_curator_domain.db import get_session_factory
+from poi_curator_domain.settings import get_settings
 from poi_curator_scoring.backend import get_database_scoring_backend
 from poi_curator_scoring.check_suites import (
     SuiteRunArtifact,
@@ -22,6 +23,7 @@ from poi_curator_scoring.checks import (
     run_check_case,
     write_report_files,
 )
+from sqlalchemy.engine import make_url
 
 
 def main() -> int:
@@ -35,9 +37,13 @@ def main() -> int:
     out_dir = args.out_dir or default_suite_run_dir()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    backend = get_database_scoring_backend()
+    backend = get_database_scoring_backend(
+        allow_fixture_fallback=args.allow_fixture_fallback,
+    )
     session_factory = get_session_factory()
     suite_artifacts: list[SuiteRunArtifact] = []
+    database_target = summarize_database_target()
+    backend_mode = "hybrid" if args.allow_fixture_fallback else "database_only"
 
     with session_factory() as session:
         for suite_name in suite_names:
@@ -46,7 +52,13 @@ def main() -> int:
             runs = [
                 run_check_case(backend, session, case, expectation_based=True) for case in cases
             ]
-            report = build_report(runs, fixtures_path=args.fixtures)
+            report = build_report(
+                runs,
+                fixtures_path=args.fixtures,
+                backend_mode=backend_mode,
+                fixture_fallback_allowed=args.allow_fixture_fallback,
+                database_target=database_target,
+            )
             json_path = out_dir / f"{suite.name}.json"
             markdown_path = out_dir / f"{suite.name}.md"
             write_report_files(
@@ -69,7 +81,13 @@ def main() -> int:
                 case_dir = out_dir / suite.name
                 case_dir.mkdir(parents=True, exist_ok=True)
                 for run in runs:
-                    case_report = build_report([run], fixtures_path=args.fixtures)
+                    case_report = build_report(
+                        [run],
+                        fixtures_path=args.fixtures,
+                        backend_mode=backend_mode,
+                        fixture_fallback_allowed=args.allow_fixture_fallback,
+                        database_target=database_target,
+                    )
                     write_report_files(
                         case_report,
                         json_out=case_dir / f"{run.case_id}.json",
@@ -120,6 +138,14 @@ def parse_args() -> argparse.Namespace:
         help="Write fuller score breakdowns into markdown reports.",
     )
     parser.add_argument(
+        "--allow-fixture-fallback",
+        action="store_true",
+        help=(
+            "Allow fixture fallback instead of hard-failing on DB query errors "
+            "or empty DB results."
+        ),
+    )
+    parser.add_argument(
         "--list-suites",
         action="store_true",
         help="Print available suite names and exit.",
@@ -142,6 +168,15 @@ def print_suite_summary(*, suite_name: str, report: object, verbose: bool) -> No
             print("")
         print(render_terminal_run(run, verbose=verbose))
     print("")
+
+
+def summarize_database_target() -> str:
+    settings = get_settings()
+    url = make_url(settings.database_url)
+    host = url.host or "unknown-host"
+    port = str(url.port) if url.port is not None else "default"
+    database = url.database or "unknown-db"
+    return f"{host}:{port}/{database}"
 
 
 if __name__ == "__main__":
