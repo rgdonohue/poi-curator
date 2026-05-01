@@ -78,6 +78,7 @@ def _to_route_result(
         "mixed" if fixture.primary_category == "mixed" else "primary"
     )
     return RouteResult(
+        data_source="fixture_fallback",
         poi_id=fixture.poi_id,
         name=fixture.name,
         primary_category=fixture.primary_category,
@@ -126,6 +127,7 @@ def suggest_places(payload: RouteSuggestRequest) -> RouteSuggestResponse:
     ]
 
     return RouteSuggestResponse(
+        data_source="fixture_fallback",
         query_summary=QuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
@@ -182,6 +184,7 @@ def _build_nearby_fixture_results(
     scored_results.sort(key=lambda item: (-item[0], item[1].poi_id))
     return [
         NearbyResult(
+            data_source="fixture_fallback",
             poi_id=fixture.poi_id,
             name=fixture.name,
             primary_category=fixture.primary_category,
@@ -264,6 +267,7 @@ def suggest_nearby_places(payload: NearbySuggestRequest) -> NearbySuggestRespons
     )
 
     return NearbySuggestResponse(
+        data_source="fixture_fallback",
         query_summary=NearbyQuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,

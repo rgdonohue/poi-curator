@@ -250,6 +250,7 @@ def build_route_result(
         category for category in poi.display_categories if category != poi.normalized_category
     ]
     return RouteResult(
+        data_source="database",
         poi_id=poi.poi_id,
         name=poi.editorial.editorial_title_override
         if poi.editorial is not None and poi.editorial.editorial_title_override

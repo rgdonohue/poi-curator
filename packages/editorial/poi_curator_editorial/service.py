@@ -2,12 +2,26 @@ import logging
 from datetime import UTC, datetime
 from typing import TYPE_CHECKING, cast
 
+from poi_curator_domain.admin_responses import (
+    build_admin_match_diagnostic_item,
+    build_admin_theme_membership_detail,
+)
 from poi_curator_domain.db import (
     POI,
     OfficialMatchDiagnostic,
     POIAlias,
+    POIEditorial,
     POIEvidence,
     POIThemeEditorial,
+)
+from poi_curator_domain.evidence_rollup import recompute_evidence_signals
+from poi_curator_domain.historic_register import (
+    NM_STATE_REGISTER_SOURCE_ID,
+    NRHP_SOURCE_ID,
+    HistoricRegisterRow,
+    build_nrhp_evidence,
+    build_state_register_evidence,
+    normalize_historic_name,
 )
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
@@ -15,6 +29,8 @@ from poi_curator_domain.schemas import (
     AdminAliasMutationResponse,
     AdminCreateAliasRequest,
     AdminPOIAliasItem,
+    AdminPOIPatchRequest,
+    AdminPOIPatchResponse,
     AdminResolveDiagnosticRequest,
     AdminSuppressDiagnosticRequest,
     AdminThemeReviewRequest,
@@ -26,24 +42,57 @@ from poi_curator_domain.theme_service import (
     sync_theme_memberships,
 )
 from poi_curator_domain.themes import ThemeSlug
-from poi_curator_enrichment.pipeline import (
-    build_nrhp_evidence,
-    build_state_register_evidence,
-    recompute_evidence_signals,
-)
-from poi_curator_scoring.query_service import (
-    build_admin_match_diagnostic_item,
-    get_admin_theme_membership_detail,
-)
 from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 if TYPE_CHECKING:
     from poi_curator_domain.schemas import AdminMatchDiagnosticItem
-    from poi_curator_enrichment.historic_register import HistoricRegisterRow
 
 
 logger = logging.getLogger(__name__)
+
+
+def patch_admin_poi(
+    db: Session,
+    poi_id: str,
+    payload: AdminPOIPatchRequest,
+) -> AdminPOIPatchResponse | None:
+    poi = db.scalar(
+        select(POI)
+        .where(POI.poi_id == poi_id)
+        .options(joinedload(POI.editorial))
+    )
+    if poi is None:
+        return None
+
+    changes = payload.model_dump(exclude_none=True)
+    editorial = poi.editorial
+    if editorial is None:
+        editorial = POIEditorial(
+            poi_id=poi.poi_id,
+            editorial_status=poi.review_status,
+            editorial_boost=0,
+        )
+        db.add(editorial)
+        poi.editorial = editorial
+
+    for field, value in changes.items():
+        setattr(editorial, field, value)
+    editorial.last_reviewed_at = datetime.now(UTC)
+    db.commit()
+
+    log_event(
+        logger,
+        "admin_poi_patch_persisted",
+        poi_id=poi.poi_id,
+        changed_fields=",".join(sorted(changes)),
+    )
+    return AdminPOIPatchResponse(
+        poi_id=poi_id,
+        applied_changes=changes,
+        persisted=True,
+        message="Persisted editorial overrides.",
+    )
 
 
 def resolve_match_diagnostic(
@@ -256,14 +305,11 @@ def review_theme_membership(
         reviewed_by=payload.reviewed_by,
     )
 
-    detail = get_admin_theme_membership_detail(db, poi_id=poi.poi_id, theme_slug=theme_slug)
-    if detail is None:
-        raise ValueError("Theme review was saved, but the detail view could not be rebuilt.")
     return AdminThemeReviewResponse(
         poi_id=poi.poi_id,
         theme_slug=cast(ThemeSlug, theme_slug),
         reviewed=True,
-        detail=detail,
+        detail=build_admin_theme_membership_detail(poi, theme_slug),
     )
 
 
@@ -322,8 +368,6 @@ def ensure_alias(
     is_preferred: bool,
     notes: str | None,
 ) -> tuple[POIAlias, bool]:
-    from poi_curator_enrichment.historic_register import normalize_historic_name
-
     normalized_alias = normalize_historic_name(alias_name, relaxed=False)
     for alias in poi.aliases:
         if alias.normalized_alias == normalized_alias:
@@ -357,11 +401,6 @@ def upsert_official_evidence_from_diagnostic(
     poi: POI,
     resolution_method: str,
 ) -> None:
-    from poi_curator_enrichment.historic_register import (
-        NM_STATE_REGISTER_SOURCE_ID,
-        NRHP_SOURCE_ID,
-    )
-
     row = historic_row_from_diagnostic(diagnostic)
     if diagnostic.source_id == NRHP_SOURCE_ID:
         evidence = build_nrhp_evidence(
@@ -401,8 +440,6 @@ def upsert_official_evidence_from_diagnostic(
 
 
 def historic_row_from_diagnostic(diagnostic: OfficialMatchDiagnostic) -> "HistoricRegisterRow":
-    from poi_curator_enrichment.historic_register import HistoricRegisterRow
-
     raw = diagnostic.raw_payload_json or {}
     return HistoricRegisterRow(
         reference_number=diagnostic.external_record_id or "",

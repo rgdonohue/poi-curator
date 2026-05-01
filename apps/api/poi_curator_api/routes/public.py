@@ -1,5 +1,9 @@
+import sys
+import time
+
 from fastapi import APIRouter, HTTPException
 from poi_curator_domain.categories import PUBLIC_CATEGORIES, CategoryResponse
+from poi_curator_domain.query_logging import write_query_log_if_enabled
 from poi_curator_domain.schemas import (
     AppConfigResponse,
     NearbySuggestRequest,
@@ -17,13 +21,14 @@ router = APIRouter(tags=["public"])
 
 
 @router.get("/health")
-def health() -> dict[str, str]:
+def health(backend: ScoringBackendDep) -> dict[str, str]:
     settings = get_settings()
     return {
         "status": "ok",
         "service": "poi-curator",
         "environment": settings.env,
         "scoring_profile_version": settings.scoring_profile_version,
+        "scoring_source": backend.current_scoring_source(),
     }
 
 
@@ -52,7 +57,16 @@ def route_suggest(
     db: DatabaseSession,
     backend: ScoringBackendDep,
 ) -> RouteSuggestResponse:
-    return backend.suggest_places(db, payload)
+    started = time.perf_counter()
+    response = backend.suggest_places(db, payload)
+    log_suggestion_query(
+        db,
+        endpoint="route_suggest",
+        payload=payload,
+        response=response,
+        duration_ms=elapsed_ms(started),
+    )
+    return response
 
 
 @router.post("/point/suggest", response_model=NearbySuggestResponse)
@@ -61,7 +75,17 @@ def point_suggest(
     db: DatabaseSession,
     backend: ScoringBackendDep,
 ) -> NearbySuggestResponse:
-    return backend.suggest_nearby_places(db, NearbySuggestRequest.from_point_request(payload))
+    started = time.perf_counter()
+    nearby_payload = NearbySuggestRequest.from_point_request(payload)
+    response = backend.suggest_nearby_places(db, nearby_payload)
+    log_suggestion_query(
+        db,
+        endpoint="point_suggest",
+        payload=payload,
+        response=response,
+        duration_ms=elapsed_ms(started),
+    )
+    return response
 
 
 @router.post("/nearby/suggest", response_model=NearbySuggestResponse)
@@ -70,7 +94,16 @@ def nearby_suggest(
     db: DatabaseSession,
     backend: ScoringBackendDep,
 ) -> NearbySuggestResponse:
-    return backend.suggest_nearby_places(db, payload)
+    started = time.perf_counter()
+    response = backend.suggest_nearby_places(db, payload)
+    log_suggestion_query(
+        db,
+        endpoint="nearby_suggest",
+        payload=payload,
+        response=response,
+        duration_ms=elapsed_ms(started),
+    )
+    return response
 
 
 @router.get("/poi/{poi_id}", response_model=POIDetailResponse)
@@ -83,3 +116,28 @@ def poi_detail(
     if poi is None:
         raise HTTPException(status_code=404, detail="POI not found")
     return poi
+
+
+def elapsed_ms(started: float) -> int:
+    return int(round((time.perf_counter() - started) * 1000))
+
+
+def log_suggestion_query(
+    db: DatabaseSession,
+    *,
+    endpoint: str,
+    payload: RouteSuggestRequest | NearbySuggestRequest | PointSuggestRequest,
+    response: RouteSuggestResponse | NearbySuggestResponse,
+    duration_ms: int,
+) -> None:
+    try:
+        write_query_log_if_enabled(
+            db,
+            endpoint=endpoint,
+            request_payload=payload.model_dump(mode="json"),
+            scoring_profile_version=get_settings().scoring_profile_version,
+            response=response,
+            duration_ms=duration_ms,
+        )
+    except Exception as exc:
+        print(f"query logging failed: {exc}", file=sys.stderr)

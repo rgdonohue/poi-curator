@@ -1,24 +1,16 @@
 import logging
 from functools import lru_cache
-from typing import Protocol
+from typing import Literal, Protocol
 
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
-    AdminAliasFromDiagnosticRequest,
-    AdminAliasMutationResponse,
-    AdminCreateAliasRequest,
     AdminMatchDiagnosticItem,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
-    AdminPOIPatchRequest,
-    AdminPOIPatchResponse,
-    AdminResolveDiagnosticRequest,
-    AdminSuppressDiagnosticRequest,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
-    AdminThemeReviewRequest,
-    AdminThemeReviewResponse,
     AdminThemeSummaryItem,
+    DataSource,
     NearbySuggestRequest,
     NearbySuggestResponse,
     POIDetailResponse,
@@ -26,7 +18,6 @@ from poi_curator_domain.schemas import (
     RouteSuggestResponse,
 )
 from poi_curator_domain.settings import get_settings
-from poi_curator_editorial import service as editorial_service
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -70,13 +61,6 @@ class ScoringBackend(Protocol):
         limit: int,
     ) -> list[AdminMatchDiagnosticItem]: ...
 
-    def patch_admin_poi(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminPOIPatchRequest,
-    ) -> AdminPOIPatchResponse | None: ...
-
     def get_admin_theme_summaries(
         self,
         db: Session,
@@ -104,42 +88,7 @@ class ScoringBackend(Protocol):
         theme_slug: str,
     ) -> AdminThemeMembershipDetailResponse | None: ...
 
-    def review_theme_membership(
-        self,
-        db: Session,
-        *,
-        poi_id: str,
-        theme_slug: str,
-        payload: AdminThemeReviewRequest,
-    ) -> AdminThemeReviewResponse | None: ...
-
-    def resolve_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminResolveDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None: ...
-
-    def create_alias_from_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminAliasFromDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None: ...
-
-    def suppress_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminSuppressDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None: ...
-
-    def add_poi_alias(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminCreateAliasRequest,
-    ) -> AdminAliasMutationResponse | None: ...
+    def current_scoring_source(self) -> DataSource | Literal["unknown"]: ...
 
 
 class FixtureScoringBackend:
@@ -194,20 +143,6 @@ class FixtureScoringBackend:
             limit=limit,
         )
 
-    def patch_admin_poi(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminPOIPatchRequest,
-    ) -> AdminPOIPatchResponse | None:
-        del db
-        return AdminPOIPatchResponse(
-            poi_id=poi_id,
-            applied_changes=payload.model_dump(exclude_none=True),
-            persisted=False,
-            message="Scaffold response only. Persistence will be added with the editorial layer.",
-        )
-
     def get_admin_theme_summaries(
         self,
         db: Session,
@@ -241,52 +176,8 @@ class FixtureScoringBackend:
         del db, poi_id, theme_slug
         return None
 
-    def review_theme_membership(
-        self,
-        db: Session,
-        *,
-        poi_id: str,
-        theme_slug: str,
-        payload: AdminThemeReviewRequest,
-    ) -> AdminThemeReviewResponse | None:
-        del db, poi_id, theme_slug, payload
-        return None
-
-    def resolve_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminResolveDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        del db, diagnostic_id, payload
-        return None
-
-    def create_alias_from_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminAliasFromDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        del db, diagnostic_id, payload
-        return None
-
-    def suppress_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminSuppressDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        del db, diagnostic_id, payload
-        return None
-
-    def add_poi_alias(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminCreateAliasRequest,
-    ) -> AdminAliasMutationResponse | None:
-        del db, poi_id, payload
-        return None
+    def current_scoring_source(self) -> DataSource | Literal["unknown"]:
+        return "fixture_fallback"
 
 
 class HybridScoringBackend(FixtureScoringBackend):
@@ -408,22 +299,6 @@ class HybridScoringBackend(FixtureScoringBackend):
             limit=limit,
         )
 
-    def patch_admin_poi(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminPOIPatchRequest,
-    ) -> AdminPOIPatchResponse | None:
-        try:
-            response = query_service.patch_admin_poi(db, poi_id, payload)
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().patch_admin_poi(db, poi_id, payload)
-        if response is not None or not self.allow_fixture_fallback:
-            return response
-        return super().patch_admin_poi(db, poi_id, payload)
-
     def get_admin_theme_summaries(
         self,
         db: Session,
@@ -514,102 +389,14 @@ class HybridScoringBackend(FixtureScoringBackend):
             theme_slug=theme_slug,
         )
 
-    def review_theme_membership(
-        self,
-        db: Session,
-        *,
-        poi_id: str,
-        theme_slug: str,
-        payload: AdminThemeReviewRequest,
-    ) -> AdminThemeReviewResponse | None:
-        try:
-            response = editorial_service.review_theme_membership(
-                db,
-                poi_id=poi_id,
-                theme_slug=theme_slug,
-                payload=payload,
-            )
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().review_theme_membership(
-                db,
-                poi_id=poi_id,
-                theme_slug=theme_slug,
-                payload=payload,
-            )
-        if response is not None or not self.allow_fixture_fallback:
-            return response
-        return super().review_theme_membership(
-            db,
-            poi_id=poi_id,
-            theme_slug=theme_slug,
-            payload=payload,
-        )
-
-    def resolve_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminResolveDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        try:
-            item = editorial_service.resolve_match_diagnostic(db, diagnostic_id, payload)
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().resolve_match_diagnostic(db, diagnostic_id, payload)
-        if item is not None or not self.allow_fixture_fallback:
-            return item
-        return super().resolve_match_diagnostic(db, diagnostic_id, payload)
-
-    def create_alias_from_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminAliasFromDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        try:
-            item = editorial_service.create_alias_from_diagnostic(db, diagnostic_id, payload)
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().create_alias_from_diagnostic(db, diagnostic_id, payload)
-        if item is not None or not self.allow_fixture_fallback:
-            return item
-        return super().create_alias_from_diagnostic(db, diagnostic_id, payload)
-
-    def suppress_match_diagnostic(
-        self,
-        db: Session,
-        diagnostic_id: int,
-        payload: AdminSuppressDiagnosticRequest,
-    ) -> AdminMatchDiagnosticItem | None:
-        try:
-            item = editorial_service.suppress_match_diagnostic(db, diagnostic_id, payload)
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().suppress_match_diagnostic(db, diagnostic_id, payload)
-        if item is not None or not self.allow_fixture_fallback:
-            return item
-        return super().suppress_match_diagnostic(db, diagnostic_id, payload)
-
-    def add_poi_alias(
-        self,
-        db: Session,
-        poi_id: str,
-        payload: AdminCreateAliasRequest,
-    ) -> AdminAliasMutationResponse | None:
-        try:
-            response = editorial_service.add_poi_alias(db, poi_id, payload)
-        except SQLAlchemyError:
-            if not self.allow_fixture_fallback:
-                raise
-            return super().add_poi_alias(db, poi_id, payload)
-        if response is not None or not self.allow_fixture_fallback:
-            return response
-        return super().add_poi_alias(db, poi_id, payload)
+    def current_scoring_source(self) -> DataSource | Literal["unknown"]:
+        if self.last_query_source is None:
+            return "unknown"
+        if self.last_query_source.startswith("fixture_fallback"):
+            return "fixture_fallback"
+        if self.last_query_source.startswith("database"):
+            return "database"
+        return "unknown"
 
     def _set_last_query_source(self, source: str) -> None:
         self.last_query_source = source

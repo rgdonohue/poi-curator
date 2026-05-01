@@ -5,7 +5,7 @@ from poi_curator_domain.categories import (
     ClassificationResult,
     classify_osm_tags,
 )
-from poi_curator_domain.descriptions import DESCRIPTION_TEMPLATES, is_low_quality_description
+from poi_curator_domain.descriptions import build_short_description
 from poi_curator_domain.regions import RegionSpec
 from poi_curator_domain.text import slugify
 from shapely.geometry import LineString, Point, Polygon, shape
@@ -300,15 +300,6 @@ def apply_name_specific_category_overrides(
     insert_at = 1 if result else 0
     result.insert(insert_at, "history")
     return result
-
-
-def build_short_description(internal_type: str, tags: dict[str, str]) -> str:
-    if description := tags.get("description"):
-        normalized = description[:220].strip()
-        if not is_low_quality_description(normalized):
-            return normalized
-
-    return DESCRIPTION_TEMPLATES[internal_type]
 
 
 def walk_affinity_for_internal_type(internal_type: str) -> float:

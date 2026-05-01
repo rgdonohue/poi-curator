@@ -2,12 +2,85 @@ from collections.abc import Iterator
 
 import pytest
 from fastapi.testclient import TestClient
+from poi_curator_api.dependencies import get_db_session, get_default_scoring_backend
 from poi_curator_api.main import app
+from poi_curator_domain.schemas import (
+    DataSource,
+    NearbyQuerySummary,
+    NearbySuggestRequest,
+    NearbySuggestResponse,
+    QuerySummary,
+    RouteResult,
+    RouteSuggestRequest,
+    RouteSuggestResponse,
+)
 from poi_curator_domain.settings import get_settings
 
 client = TestClient(app)
 ADMIN_KEY = "unit-test-admin-key"
 ADMIN_HEADERS = {"X-POI-Curator-Admin-Key": ADMIN_KEY}
+
+
+class ProvenanceBackend:
+    def __init__(self, data_source: DataSource) -> None:
+        self.data_source = data_source
+
+    def current_scoring_source(self) -> DataSource:
+        return self.data_source
+
+    def suggest_places(self, db: object, payload: RouteSuggestRequest) -> RouteSuggestResponse:
+        del db
+        return RouteSuggestResponse(
+            data_source=self.data_source,
+            query_summary=QuerySummary(
+                travel_mode=payload.travel_mode,
+                category=payload.category,
+                theme=payload.theme,
+                max_detour_meters=payload.max_detour_meters,
+                limit=payload.limit,
+            ),
+            results=[
+                RouteResult(
+                    data_source=self.data_source,
+                    poi_id="poi-provenance",
+                    name="Provenance POI",
+                    primary_category=payload.category,
+                    secondary_categories=[],
+                    category_match_type="primary",
+                    coordinates=[-105.93, 35.68],
+                    short_description="desc",
+                    distance_from_route_m=10,
+                    estimated_detour_m=20,
+                    estimated_extra_minutes=1,
+                    score=90.0,
+                    score_breakdown={"total": 90.0},
+                    why_it_matters=["test"],
+                    badges=[],
+                )
+            ],
+        )
+
+    def suggest_nearby_places(
+        self,
+        db: object,
+        payload: NearbySuggestRequest,
+    ) -> NearbySuggestResponse:
+        del db
+        return NearbySuggestResponse(
+            data_source=self.data_source,
+            query_summary=NearbyQuerySummary(
+                travel_mode=payload.travel_mode,
+                category=payload.category,
+                theme=payload.theme,
+                radius_meters=payload.radius_meters,
+                limit=payload.limit,
+            ),
+            results=[],
+        )
+
+
+def fake_db_session() -> Iterator[object]:
+    yield object()
 
 
 @pytest.fixture
@@ -66,8 +139,66 @@ def test_route_suggest_endpoint() -> None:
 
     assert response.status_code == 200
     payload = response.json()
+    assert payload["data_source"] in {"database", "fixture_fallback"}
+    assert payload["results"][0]["data_source"] == payload["data_source"]
     assert payload["query_summary"]["category"] == "history"
     assert len(payload["results"]) >= 1
+
+
+def test_suggestion_response_exposes_database_provenance() -> None:
+    app.dependency_overrides[get_default_scoring_backend] = lambda: ProvenanceBackend("database")
+    app.dependency_overrides[get_db_session] = fake_db_session
+    try:
+        response = client.post(
+            "/v1/route/suggest",
+            json={
+                "route_geometry": {
+                    "type": "LineString",
+                    "coordinates": [[-105.94, 35.68], [-105.93, 35.67]],
+                },
+                "origin": {"name": "A", "coordinates": [-105.94, 35.68]},
+                "destination": {"name": "B", "coordinates": [-105.93, 35.67]},
+                "travel_mode": "driving",
+                "category": "history",
+                "max_detour_meters": 1600,
+                "max_extra_minutes": 8,
+                "limit": 3,
+            },
+        )
+        health_response = client.get("/v1/health")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["data_source"] == "database"
+    assert payload["results"][0]["data_source"] == "database"
+    assert health_response.json()["scoring_source"] == "database"
+
+
+def test_suggestion_response_exposes_fixture_fallback_provenance() -> None:
+    app.dependency_overrides[get_default_scoring_backend] = lambda: ProvenanceBackend(
+        "fixture_fallback"
+    )
+    app.dependency_overrides[get_db_session] = fake_db_session
+    try:
+        response = client.post(
+            "/v1/nearby/suggest",
+            json={
+                "center": {"lat": 35.687, "lon": -105.9378},
+                "travel_mode": "walking",
+                "category": "history",
+                "radius_meters": 1200,
+                "limit": 5,
+            },
+        )
+        health_response = client.get("/v1/health")
+    finally:
+        app.dependency_overrides.clear()
+
+    assert response.status_code == 200
+    assert response.json()["data_source"] == "fixture_fallback"
+    assert health_response.json()["scoring_source"] == "fixture_fallback"
 
 
 def test_route_suggest_rejects_out_of_range_coordinate() -> None:

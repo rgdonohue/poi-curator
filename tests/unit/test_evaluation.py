@@ -69,6 +69,7 @@ def test_evaluate_route_case_passes_on_expected_match() -> None:
         },
     )
     response = RouteSuggestResponse(
+        data_source="database",
         query_summary=QuerySummary(
             travel_mode="driving",
             category="history",
@@ -77,6 +78,7 @@ def test_evaluate_route_case_passes_on_expected_match() -> None:
         ),
         results=[
             RouteResult(
+                data_source="database",
                 poi_id="1",
                 name="De Vargas Street House",
                 primary_category="history",
@@ -110,6 +112,7 @@ def test_evaluate_nearby_case_dispatches_and_flags_soft_preference() -> None:
     cases = load_evaluation_cases(Path("data/fixtures/eval_santa_fe.json"))
     nearby_case = next(case for case in cases if case.id == "nearby-plaza-history")
     response = NearbySuggestResponse(
+        data_source="database",
         query_summary=NearbyQuerySummary(
             travel_mode="walking",
             category="history",
@@ -118,6 +121,7 @@ def test_evaluate_nearby_case_dispatches_and_flags_soft_preference() -> None:
         ),
         results=[
             NearbyResult(
+                data_source="database",
                 poi_id="2",
                 name="Museum of Contemporary Native Arts",
                 primary_category="history",
@@ -152,6 +156,7 @@ def test_evaluate_case_can_require_multiple_preferred_top_names() -> None:
     cases = load_evaluation_cases(Path("data/fixtures/eval_santa_fe.json"))
     nearby_case = next(case for case in cases if case.id == "nearby-plaza-history")
     response = NearbySuggestResponse(
+        data_source="database",
         query_summary=NearbyQuerySummary(
             travel_mode="walking",
             category="history",
@@ -160,6 +165,7 @@ def test_evaluate_case_can_require_multiple_preferred_top_names() -> None:
         ),
         results=[
             NearbyResult(
+                data_source="database",
                 poi_id="2",
                 name="Palace of the Governors",
                 primary_category="history",
@@ -176,6 +182,7 @@ def test_evaluate_case_can_require_multiple_preferred_top_names() -> None:
                 badges=["history"],
             ),
             NearbyResult(
+                data_source="database",
                 poi_id="3",
                 name="Museum of Contemporary Native Arts",
                 primary_category="history",
@@ -211,6 +218,7 @@ def test_render_combined_markdown_report_contains_mode_and_purpose() -> None:
     cases = load_evaluation_cases(Path("data/fixtures/eval_santa_fe.json"))
     nearby_case = next(case for case in cases if case.id == "nearby-downtown-scenic-empty")
     response = NearbySuggestResponse(
+        data_source="database",
         query_summary=NearbyQuerySummary(
             travel_mode="walking",
             category="scenic",
@@ -244,6 +252,7 @@ def test_legacy_route_fixture_loader_and_report_still_work() -> None:
     assert len(fixtures) >= 5
 
     response = RouteSuggestResponse(
+        data_source="database",
         query_summary=QuerySummary(
             travel_mode="driving",
             category="history",
@@ -252,6 +261,7 @@ def test_legacy_route_fixture_loader_and_report_still_work() -> None:
         ),
         results=[
             RouteResult(
+                data_source="database",
                 poi_id="1",
                 name="De Vargas Street House",
                 primary_category="history",

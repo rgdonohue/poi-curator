@@ -9,16 +9,23 @@ from poi_curator_domain.db import (
     OfficialMatchDiagnostic,
     POIAlias,
     POIEvidence,
-    POISignals,
     POIThemeMembershipEvidence,
     SourceRegistry,
 )
-from poi_curator_domain.descriptions import description_quality_score
+from poi_curator_domain.descriptions import build_short_description, description_quality_score
+from poi_curator_domain.evidence_rollup import (
+    recompute_evidence_signals,
+)
+from poi_curator_domain.evidence_rollup import (
+    summarize_evidence_signals as summarize_evidence_signals,
+)
+from poi_curator_domain.historic_register import (
+    build_nrhp_evidence,
+    build_state_register_evidence,
+)
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.settings import get_settings
 from poi_curator_domain.text import slugify
-from poi_curator_domain.theme_service import sync_theme_memberships
-from poi_curator_ingestion.normalize import build_short_description
 from sqlalchemy import delete, or_, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -35,8 +42,6 @@ from poi_curator_enrichment.historic_register import (
     NM_STATE_REGISTER_SOURCE_ID,
     NRHP_SOURCE_ID,
     HistoricRegisterRow,
-    build_nrhp_evidence_key,
-    build_state_register_evidence_key,
     evaluate_register_row_match,
     fetch_nrhp_rows,
     filter_rows_for_region,
@@ -76,14 +81,6 @@ class CityGISEnrichmentSummary:
     evidence_created: int
     unmatched_feature_count: int
     impacted_poi_count: int
-
-
-@dataclass(frozen=True)
-class EvidenceSignalSummary:
-    has_official_heritage_match: bool
-    official_corroboration_score: float
-    district_membership_score: float
-    institutional_identity_score: float
 
 
 @dataclass(frozen=True)
@@ -853,69 +850,6 @@ def build_poi_evidence(feature: CityGISFeature, poi_id: str, confidence: float) 
     )
 
 
-def build_nrhp_evidence(
-    row: HistoricRegisterRow,
-    poi_id: str,
-    confidence: float,
-    *,
-    match_strategy: str | None = None,
-) -> POIEvidence:
-    return POIEvidence(
-        evidence_key=build_nrhp_evidence_key(poi_id, row.reference_number),
-        poi_id=poi_id,
-        source_id=NRHP_SOURCE_ID,
-        evidence_type="historic_designation",
-        evidence_label=row.property_name,
-        evidence_text=f"Listed in the National Register of Historic Places on {row.listed_date}.",
-        evidence_url=row.external_link,
-        external_record_id=row.reference_number,
-        confidence=round(confidence, 3),
-        raw_evidence_json={
-            "city": row.city,
-            "county": row.county,
-            "street_address": row.street_address,
-            "category_of_property": row.category_of_property,
-            "other_names": row.other_names,
-            "state_register_year": row.state_register_year,
-            "match_strategy": match_strategy,
-        },
-        observed_at=datetime.now(UTC),
-    )
-
-
-def build_state_register_evidence(
-    row: HistoricRegisterRow,
-    poi_id: str,
-    confidence: float,
-    *,
-    match_strategy: str | None = None,
-) -> POIEvidence:
-    return POIEvidence(
-        evidence_key=build_state_register_evidence_key(
-            poi_id,
-            row.reference_number,
-            row.property_name,
-        ),
-        poi_id=poi_id,
-        source_id=NM_STATE_REGISTER_SOURCE_ID,
-        evidence_type="state_historic_designation",
-        evidence_label=row.property_name,
-        evidence_text="Listed in the New Mexico state register workbook.",
-        evidence_url=row.external_link,
-        external_record_id=row.reference_number or row.property_name,
-        confidence=round(confidence, 3),
-        raw_evidence_json={
-            "city": row.city,
-            "county": row.county,
-            "street_address": row.street_address,
-            "category_of_property": row.category_of_property,
-            "other_names": row.other_names,
-            "match_strategy": match_strategy,
-        },
-        observed_at=datetime.now(UTC),
-    )
-
-
 def build_evidence_key(feature: CityGISFeature, poi_id: str) -> str:
     raw = (
         f"{poi_id}:{feature.layer.source_id}:{feature.layer.evidence_type}:"
@@ -932,89 +866,3 @@ def build_evidence_text(feature: CityGISFeature) -> str:
         if parts:
             return "; ".join(parts)
     return f"{feature.label} via City of Santa Fe GIS"
-
-
-def recompute_evidence_signals(session: Session, pois: list[POI]) -> None:
-    if not pois:
-        return
-    poi_ids = [poi.poi_id for poi in pois]
-    evidence_rows = session.execute(
-        select(POIEvidence).where(POIEvidence.poi_id.in_(poi_ids))
-    ).scalars().all()
-    evidence_by_poi: dict[str, list[POIEvidence]] = {poi_id: [] for poi_id in poi_ids}
-    for evidence in evidence_rows:
-        evidence_by_poi[evidence.poi_id].append(evidence)
-
-    for poi in pois:
-        signals = poi.signals
-        if signals is None:
-            signals = POISignals(
-                poi_id=poi.poi_id,
-                computed_at=datetime.now(UTC),
-            )
-            session.add(signals)
-            poi.signals = signals
-
-        evidence_summary = summarize_evidence_signals(evidence_by_poi.get(poi.poi_id, []))
-        signals.has_official_heritage_match = evidence_summary.has_official_heritage_match
-        signals.official_corroboration_score = evidence_summary.official_corroboration_score
-        signals.district_membership_score = evidence_summary.district_membership_score
-        signals.institutional_identity_score = evidence_summary.institutional_identity_score
-        signals.local_identity_score = max(
-            signals.local_identity_score,
-            (
-                0.4
-                + signals.district_membership_score * 0.3
-                + signals.institutional_identity_score * 0.3
-            ),
-        )
-        signals.editorial_priority_seed = max(
-            signals.editorial_priority_seed,
-            0.4 + signals.official_corroboration_score * 0.4,
-        )
-        signals.computed_at = datetime.now(UTC)
-    sync_theme_memberships(session, pois)
-
-
-def summarize_evidence_signals(evidence_rows: list[POIEvidence]) -> EvidenceSignalSummary:
-    official = 0.0
-    district = 0.0
-    institutional = 0.0
-    has_official_heritage_match = False
-    for evidence in evidence_rows:
-        if evidence.evidence_type == "historic_building_status":
-            official += 0.9
-            district += 0.45
-            has_official_heritage_match = True
-        elif evidence.evidence_type == "district_membership":
-            official += 0.6
-            district += 0.8
-            has_official_heritage_match = True
-        elif evidence.evidence_type == "boundary_membership":
-            official += 0.35
-            district += 0.7
-        elif evidence.evidence_type == "institution_membership":
-            official += 0.3
-            institutional += 0.75
-        elif evidence.evidence_type == "historic_designation":
-            official += 1.0
-            has_official_heritage_match = True
-            category_of_property = str(
-                (evidence.raw_evidence_json or {}).get("category_of_property", "")
-            ).upper()
-            if "DISTRICT" in category_of_property:
-                district += 0.9
-        elif evidence.evidence_type == "state_historic_designation":
-            official += 0.8
-            has_official_heritage_match = True
-            category_of_property = str(
-                (evidence.raw_evidence_json or {}).get("category_of_property", "")
-            ).upper()
-            if "DISTRICT" in category_of_property:
-                district += 0.75
-    return EvidenceSignalSummary(
-        has_official_heritage_match=has_official_heritage_match,
-        official_corroboration_score=min(1.0, official),
-        district_membership_score=min(1.0, district),
-        institutional_identity_score=min(1.0, institutional),
-    )

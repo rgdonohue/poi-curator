@@ -354,3 +354,21 @@ class OfficialMatchDiagnostic(Base):
         foreign_keys=[matched_poi_id],
     )
     resolved_poi: Mapped[POI | None] = relationship(foreign_keys=[resolved_poi_id])
+
+
+class QueryLog(Base):
+    __tablename__ = "query_log"
+
+    id: Mapped[str] = mapped_column(
+        UUID(as_uuid=False),
+        primary_key=True,
+        default=lambda: str(uuid4()),
+    )
+    timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    endpoint: Mapped[str] = mapped_column(String(64), nullable=False)
+    request_payload: Mapped[dict] = mapped_column(JSONB, nullable=False)
+    scoring_profile_version: Mapped[str] = mapped_column(String(64), nullable=False)
+    data_source: Mapped[str] = mapped_column(String(32), nullable=False)
+    result_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    results: Mapped[list[dict]] = mapped_column(JSONB, nullable=False)
+    duration_ms: Mapped[int] = mapped_column(Integer, nullable=False)

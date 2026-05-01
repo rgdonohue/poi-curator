@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://poi_curator:poi_curator@localhost:5432/poi_curator"
     admin_key: str | None = None
     allow_fixture_fallback: bool = True
+    query_logging: bool = False
     default_region: str = "santa-fe"
     scoring_profile_version: str = "v0"
     overpass_url: str = "https://overpass-api.de/api/interpreter"

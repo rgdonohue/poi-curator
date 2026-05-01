@@ -715,7 +715,16 @@ The current intended workflow is:
 - Historic reconciliation still depends heavily on name matching, even with aliases and diagnostics.
 - Hybrid fixture fallback is helpful during development but can obscure whether a response came from the fully operational DB-backed path unless checked carefully.
 
-## 12. Decision Standard for Future Changes
+## 12. Result Provenance
+
+Suggestion responses expose `data_source` at both the response and result level. Values are
+`database` for PostGIS-backed scoring and `fixture_fallback` for fallback fixture scoring. Clients
+should treat fallback results as development scaffolding, not authoritative corpus evidence.
+
+`GET /v1/health` also reports the currently active scoring source when the backend can determine it.
+Before any suggestion query has run, hybrid backends may report `unknown`.
+
+## 13. Decision Standard for Future Changes
 
 Future changes should be evaluated against the methodology already encoded here:
 

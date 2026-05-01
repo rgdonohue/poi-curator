@@ -7,27 +7,27 @@ from dataclasses import dataclass
 from typing import Any, Protocol
 from urllib.request import Request, urlopen
 
+from poi_curator_domain.historic_register import (
+    NM_STATE_REGISTER_SOURCE_ID as NM_STATE_REGISTER_SOURCE_ID,
+)
+from poi_curator_domain.historic_register import (
+    NRHP_SOURCE_ID as NRHP_SOURCE_ID,
+)
+from poi_curator_domain.historic_register import (
+    HistoricRegisterRow as HistoricRegisterRow,
+)
+from poi_curator_domain.historic_register import (
+    build_nrhp_evidence_key as build_nrhp_evidence_key,
+)
+from poi_curator_domain.historic_register import (
+    build_state_register_evidence_key as build_state_register_evidence_key,
+)
+from poi_curator_domain.historic_register import (
+    normalize_historic_name as normalize_historic_name,
+)
 from poi_curator_domain.text import slugify
 
 from poi_curator_enrichment.city_gis import name_similarity
-
-NRHP_SOURCE_ID = "nrhp_listed_properties"
-NM_STATE_REGISTER_SOURCE_ID = "nm_hpd_register_workbook"
-
-
-@dataclass(frozen=True)
-class HistoricRegisterRow:
-    reference_number: str
-    property_name: str
-    state: str
-    county: str
-    city: str
-    street_address: str
-    category_of_property: str
-    listed_date: str
-    external_link: str | None
-    other_names: str | None
-    state_register_year: str | None = None
 
 
 @dataclass(frozen=True)
@@ -94,49 +94,7 @@ SEEDED_REGION_ALIASES: dict[str, dict[str, tuple[SeedAlias, ...]]] = {
     }
 }
 
-_POSSESSIVE_RE = re.compile(r"[’']s\b")
 _ALIAS_SPLIT_RE = re.compile(r"[;,]")
-_DROP_TOKENS = {
-    "the",
-    "of",
-    "de",
-    "la",
-    "del",
-    "los",
-    "las",
-    "and",
-    "y",
-}
-_RELAXED_DROP_TOKENS = {
-    "historic",
-    "historical",
-    "national",
-    "register",
-    "listed",
-    "district",
-    "nhl",
-    "landmark",
-    "property",
-    "properties",
-    "resource",
-    "resources",
-    "additional",
-    "documentation",
-    "collection",
-    "collections",
-}
-_TOKEN_NORMALIZATIONS = {
-    "st": "saint",
-    "ft": "fort",
-    "governors": "governor",
-    "governor": "governor",
-    "residence": "house",
-    "home": "house",
-    "casa": "house",
-    "chapels": "chapel",
-    "churches": "chapel",
-    "capilla": "chapel",
-}
 
 
 def fetch_nrhp_rows(csv_url: str, *, timeout_seconds: int = 60) -> list[HistoricRegisterRow]:
@@ -306,20 +264,6 @@ def split_aliases(value: str | None) -> list[str]:
     return [alias.strip() for alias in _ALIAS_SPLIT_RE.split(value) if alias.strip()]
 
 
-def normalize_historic_name(value: str, *, relaxed: bool = False) -> str:
-    prepared = _POSSESSIVE_RE.sub("s", value.lower()).replace("&", " and ")
-    raw_tokens = slugify(prepared).replace("-", " ").split()
-    normalized_tokens: list[str] = []
-    for token in raw_tokens:
-        token = _TOKEN_NORMALIZATIONS.get(token, token)
-        if token in _DROP_TOKENS:
-            continue
-        if relaxed and token in _RELAXED_DROP_TOKENS:
-            continue
-        normalized_tokens.append(token)
-    return " ".join(normalized_tokens)
-
-
 def historic_name_forms(value: str) -> set[str]:
     return {
         normalized
@@ -396,19 +340,6 @@ def best_fuzzy_candidate(
         match_strategy="fuzzy_fallback",
         similarity=best_similarity,
     )
-
-
-def build_nrhp_evidence_key(poi_id: str, reference_number: str) -> str:
-    return slugify(f"{poi_id}:{NRHP_SOURCE_ID}:{reference_number}")[:255]
-
-
-def build_state_register_evidence_key(
-    poi_id: str,
-    reference_number: str,
-    property_name: str,
-) -> str:
-    key = reference_number or property_name
-    return slugify(f"{poi_id}:{NM_STATE_REGISTER_SOURCE_ID}:{key}")[:255]
 
 
 def seeded_aliases_for_region(region: str) -> dict[str, tuple[SeedAlias, ...]]:

@@ -1,14 +1,18 @@
 import logging
 from collections.abc import Sequence
-from datetime import UTC, datetime
 from typing import cast as type_cast
 
 from geoalchemy2 import Geometry
 from geoalchemy2.shape import to_shape
+from poi_curator_domain.admin_responses import (
+    build_admin_match_diagnostic_item,
+    build_admin_theme_membership_detail,
+    build_theme_evidence_references,
+    match_method_for_evidence,
+)
 from poi_curator_domain.db import (
     POI,
     OfficialMatchDiagnostic,
-    POIEditorial,
     POIEvidence,
     POIThemeMembership,
 )
@@ -20,11 +24,6 @@ from poi_curator_domain.schemas import (
     AdminPOIEvidenceItem,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
-    AdminPOIPatchRequest,
-    AdminPOIPatchResponse,
-    AdminThemeAutomatedMembership,
-    AdminThemeEditorialRecord,
-    AdminThemeEffectiveOutcome,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
     AdminThemeSummaryItem,
@@ -38,7 +37,6 @@ from poi_curator_domain.schemas import (
     RouteResult,
     RouteSuggestRequest,
     RouteSuggestResponse,
-    ThemeEvidenceReference,
 )
 from poi_curator_domain.theme_service import (
     get_theme_editorial_by_slug,
@@ -51,7 +49,6 @@ from poi_curator_domain.theme_service import (
 )
 from poi_curator_domain.themes import (
     THEME_LABELS,
-    ThemeEditorialDecision,
     ThemeSlug,
     is_query_theme_active,
 )
@@ -115,6 +112,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
     )
     if not pois:
         return RouteSuggestResponse(
+            data_source="database",
             query_summary=QuerySummary(
                 travel_mode=payload.travel_mode,
                 category=payload.category,
@@ -164,6 +162,7 @@ def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestRes
 
     scored_results.sort(key=lambda item: (-item[0], item[1]))
     response = RouteSuggestResponse(
+        data_source="database",
         query_summary=QuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
@@ -220,6 +219,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
     )
     if not pois:
         return NearbySuggestResponse(
+            data_source="database",
             query_summary=NearbyQuerySummary(
                 travel_mode=payload.travel_mode,
                 category=payload.category,
@@ -271,6 +271,7 @@ def suggest_nearby_places(db: Session, payload: NearbySuggestRequest) -> NearbyS
 
     scored_results.sort(key=lambda item: (-item[0], item[1]))
     response = NearbySuggestResponse(
+        data_source="database",
         query_summary=NearbyQuerySummary(
             travel_mode=payload.travel_mode,
             category=payload.category,
@@ -598,7 +599,7 @@ def get_admin_theme_membership_detail(
     editorial = get_theme_editorial_by_slug(poi, theme_slug)
     if membership is None and editorial is None:
         return None
-    return _build_admin_theme_membership_detail(poi, theme_slug)
+    return build_admin_theme_membership_detail(poi, theme_slug)
 
 
 def get_admin_match_diagnostics(
@@ -626,114 +627,6 @@ def get_admin_match_diagnostics(
         query.order_by(OfficialMatchDiagnostic.updated_at.desc()).limit(limit)
     ).all()
     return [build_admin_match_diagnostic_item(item) for item in diagnostics]
-
-
-def patch_admin_poi(
-    db: Session,
-    poi_id: str,
-    payload: AdminPOIPatchRequest,
-) -> AdminPOIPatchResponse | None:
-    poi = db.scalar(
-        select(POI)
-        .where(POI.poi_id == poi_id)
-        .options(joinedload(POI.editorial))
-    )
-    if poi is None:
-        return None
-
-    changes = payload.model_dump(exclude_none=True)
-    editorial = poi.editorial
-    if editorial is None:
-        editorial = POIEditorial(
-            poi_id=poi.poi_id,
-            editorial_status=poi.review_status,
-            editorial_boost=0,
-        )
-        db.add(editorial)
-        poi.editorial = editorial
-
-    for field, value in changes.items():
-        setattr(editorial, field, value)
-    editorial.last_reviewed_at = datetime.now(UTC)
-    db.commit()
-
-    log_event(
-        logger,
-        "admin_poi_patch_persisted",
-        poi_id=poi.poi_id,
-        changed_fields=",".join(sorted(changes)),
-    )
-    return AdminPOIPatchResponse(
-        poi_id=poi_id,
-        applied_changes=changes,
-        persisted=True,
-        message="Persisted editorial overrides.",
-    )
-
-
-def build_admin_match_diagnostic_item(item: OfficialMatchDiagnostic) -> AdminMatchDiagnosticItem:
-    return AdminMatchDiagnosticItem(
-        id=item.id,
-        source_id=item.source_id,
-        source_name=item.source.source_name if item.source is not None else None,
-        source_type=item.source.source_type if item.source is not None else None,
-        region=item.region,
-        external_record_id=item.external_record_id,
-        external_name=item.external_name,
-        normalized_name=normalized_name_for_diagnostic(item),
-        best_candidate_poi_id=item.matched_poi_id,
-        best_candidate_name=(
-            item.poi.canonical_name if item.poi is not None else item.best_candidate_name
-        ),
-        resolved_poi_id=item.resolved_poi_id,
-        resolved_poi_name=(
-            item.resolved_poi.canonical_name if item.resolved_poi is not None else None
-        ),
-        best_similarity=item.best_similarity,
-        match_strategy=item.match_strategy,
-        resolution_method=item.resolution_method,
-        why_not_auto_linked=why_not_auto_linked(item),
-        status=item.status,
-        reviewed_at=item.reviewed_at,
-        reviewed_by=item.reviewed_by,
-        created_at=item.created_at,
-        updated_at=item.updated_at,
-    )
-
-
-def match_method_for_evidence(item: object) -> str | None:
-    raw = getattr(item, "raw_evidence_json", None) or {}
-    match_strategy = raw.get("match_strategy")
-    if isinstance(match_strategy, str):
-        return match_strategy
-    return None
-
-
-def normalized_name_for_diagnostic(item: OfficialMatchDiagnostic) -> str:
-    from poi_curator_enrichment.historic_register import normalize_historic_name
-
-    return normalize_historic_name(item.external_name, relaxed=True)
-
-
-def why_not_auto_linked(item: OfficialMatchDiagnostic) -> str:
-    if item.status == "resolved":
-        target_name = (
-            item.resolved_poi.canonical_name
-            if item.resolved_poi is not None
-            else item.best_candidate_name
-        )
-        resolution_method = item.resolution_method or "manual review"
-        return f"Resolved manually to '{target_name}' via {resolution_method}."
-    if item.status == "suppressed":
-        return "Suppressed during editorial review."
-    if item.best_candidate_name is None:
-        return "No plausible canonical POI candidate was found."
-    similarity = item.best_similarity or 0.0
-    strategy = item.match_strategy or "fuzzy_fallback"
-    return (
-        f"Best candidate '{item.best_candidate_name}' via {strategy} scored "
-        f"{similarity:.3f}, below the auto-link threshold."
-    )
 
 
 def _status_for_poi(poi: POI) -> str:
@@ -812,7 +705,7 @@ def _build_theme_items(poi: POI) -> list[POIThemeItem]:
                 editorial_decision=(
                     editorial.editorial_decision if editorial is not None else None
                 ),
-                evidence=_build_theme_evidence_references(automated_membership, evidence_by_id),
+                evidence=build_theme_evidence_references(automated_membership, evidence_by_id),
             )
         )
     return items
@@ -832,84 +725,6 @@ def _load_admin_theme_pois(
     pois = db.execute(query.order_by(POI.updated_at.desc())).unique().scalars().all()
     _ensure_theme_memberships(db, pois)
     return list(pois)
-
-
-def _build_admin_theme_membership_detail(
-    poi: POI,
-    theme_slug: str,
-) -> AdminThemeMembershipDetailResponse:
-    evidence_by_id = {item.id: item for item in getattr(poi, "evidence_items", []) or []}
-    membership = get_theme_membership_by_slug(poi, theme_slug)
-    editorial = get_theme_editorial_by_slug(poi, theme_slug)
-    effective = resolve_effective_theme_membership(theme_slug, membership, editorial)
-
-    automated_membership = None
-    if membership is not None:
-        automated_membership = AdminThemeAutomatedMembership(
-            status=membership.status,
-            assignment_basis=membership.assignment_basis,
-            confidence=round(float(membership.confidence), 2),
-            rationale_summary=membership.rationale_summary,
-            computed_at=membership.computed_at,
-            evidence=_build_theme_evidence_references(membership, evidence_by_id),
-        )
-
-    editorial_record = None
-    if editorial is not None:
-        editorial_record = AdminThemeEditorialRecord(
-            editorial_decision=type_cast(
-                ThemeEditorialDecision | None,
-                editorial.editorial_decision,
-            ),
-            notes=editorial.notes,
-            reviewed_by=editorial.reviewed_by,
-            reviewed_at=editorial.reviewed_at,
-            reviewed_membership_computed_at=editorial.reviewed_membership_computed_at,
-        )
-
-    effective_outcome = None
-    if effective is not None:
-        effective_outcome = AdminThemeEffectiveOutcome(
-            status=effective.status,
-            assignment_basis=effective.assignment_basis,
-            confidence=effective.confidence,
-            rationale_summary=effective.rationale_summary,
-        )
-
-    return AdminThemeMembershipDetailResponse(
-        poi_id=poi.poi_id,
-        poi_name=poi.canonical_name,
-        city=poi.city,
-        primary_category=poi.normalized_category,
-        theme_slug=type_cast(ThemeSlug, theme_slug),
-        theme_label=THEME_LABELS.get(theme_slug, theme_slug),
-        is_query_active=is_query_theme_active(theme_slug),
-        automated_membership=automated_membership,
-        editorial_record=editorial_record,
-        effective_outcome=effective_outcome,
-    )
-
-
-def _build_theme_evidence_references(
-    membership: POIThemeMembership | None,
-    evidence_by_id: dict[int, POIEvidence],
-) -> list[ThemeEvidenceReference]:
-    if membership is None:
-        return []
-    return [
-        ThemeEvidenceReference(
-            evidence_id=link.poi_evidence_id,
-            source_id=evidence_by_id[link.poi_evidence_id].source_id,
-            evidence_type=evidence_by_id[link.poi_evidence_id].evidence_type,
-            label=evidence_by_id[link.poi_evidence_id].evidence_label,
-            confidence=evidence_by_id[link.poi_evidence_id].confidence,
-        )
-        for link in sorted(
-            getattr(membership, "evidence_links", []) or [],
-            key=lambda item: item.poi_evidence_id,
-        )
-        if link.poi_evidence_id in evidence_by_id
-    ]
 
 
 def _review_state_priority(review_state: str) -> int:

@@ -225,6 +225,16 @@ Rules:
 - Frontend handoff artifacts should label fixture-overlay rows.
 - A response that came from fallback should not be cited as proof of database corpus quality.
 
+## Query Log Retention
+
+When `POI_CURATOR_QUERY_LOGGING=true`, suggestion endpoints may write validated request payloads,
+score breakdowns, result ranks, and result provenance to `query_log` for QA and debugging. These
+logs are operational diagnostics, not canonical POI evidence or editorial interpretation.
+
+Recommended default retention is 30 days for local and staging databases, with longer retention only
+for explicitly approved QA baselines. Automatic pruning is not implemented yet, so operators should
+delete old rows manually until a retention job exists.
+
 ## Data Quality Checks
 
 Start with a manual checklist and convert high-value checks into tests or scripts.

@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Query
+from poi_curator_domain.query_logging import list_query_logs
 from poi_curator_domain.schemas import (
     AdminAliasFromDiagnosticRequest,
     AdminAliasMutationResponse,
@@ -20,10 +21,14 @@ from poi_curator_domain.schemas import (
     AdminThemeReviewRequest,
     AdminThemeReviewResponse,
     AdminThemeSummaryItem,
+    QueryLogListResponse,
 )
 from poi_curator_domain.settings import get_settings
+from poi_curator_editorial import service as editorial_service
 
 from poi_curator_api.dependencies import DatabaseSession, ScoringBackendDep
+
+OPTIONAL_DATETIME_QUERY = Query(default=None)
 
 
 def require_admin_api_key(
@@ -56,9 +61,8 @@ def patch_admin_poi(
     poi_id: str,
     payload: AdminPOIPatchRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminPOIPatchResponse:
-    response = backend.patch_admin_poi(db, poi_id, payload)
+    response = editorial_service.patch_admin_poi(db, poi_id, payload)
     if response is None:
         raise HTTPException(status_code=404, detail="POI not found")
     return response
@@ -124,10 +128,9 @@ def review_admin_theme_membership(
     theme_slug: str,
     payload: AdminThemeReviewRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminThemeReviewResponse:
     try:
-        response = backend.review_theme_membership(
+        response = editorial_service.review_theme_membership(
             db,
             poi_id=poi_id,
             theme_slug=theme_slug,
@@ -175,10 +178,9 @@ def resolve_match_diagnostic(
     diagnostic_id: int,
     payload: AdminResolveDiagnosticRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminMatchDiagnosticItem:
     try:
-        response = backend.resolve_match_diagnostic(db, diagnostic_id, payload)
+        response = editorial_service.resolve_match_diagnostic(db, diagnostic_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if response is None:
@@ -194,10 +196,9 @@ def create_alias_from_diagnostic(
     diagnostic_id: int,
     payload: AdminAliasFromDiagnosticRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminMatchDiagnosticItem:
     try:
-        response = backend.create_alias_from_diagnostic(db, diagnostic_id, payload)
+        response = editorial_service.create_alias_from_diagnostic(db, diagnostic_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if response is None:
@@ -213,10 +214,9 @@ def suppress_match_diagnostic(
     diagnostic_id: int,
     payload: AdminSuppressDiagnosticRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminMatchDiagnosticItem:
     try:
-        response = backend.suppress_match_diagnostic(db, diagnostic_id, payload)
+        response = editorial_service.suppress_match_diagnostic(db, diagnostic_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if response is None:
@@ -229,15 +229,37 @@ def add_poi_alias(
     poi_id: str,
     payload: AdminCreateAliasRequest,
     db: DatabaseSession,
-    backend: ScoringBackendDep,
 ) -> AdminAliasMutationResponse:
     try:
-        response = backend.add_poi_alias(db, poi_id, payload)
+        response = editorial_service.add_poi_alias(db, poi_id, payload)
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
     if response is None:
         raise HTTPException(status_code=404, detail="POI not found")
     return response
+
+
+@router.get("/query-logs", response_model=QueryLogListResponse)
+def admin_query_logs(
+    db: DatabaseSession,
+    endpoint: str | None = Query(default=None),
+    start: datetime | None = OPTIONAL_DATETIME_QUERY,
+    end: datetime | None = OPTIONAL_DATETIME_QUERY,
+    min_result_count: int | None = Query(default=None, ge=0),
+    max_result_count: int | None = Query(default=None, ge=0),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> QueryLogListResponse:
+    return list_query_logs(
+        db,
+        endpoint=endpoint,
+        start=start,
+        end=end,
+        min_result_count=min_result_count,
+        max_result_count=max_result_count,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.post("/ingest/run", response_model=AdminIngestRunResponse)

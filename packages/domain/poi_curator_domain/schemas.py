@@ -60,6 +60,7 @@ def validate_lon_lat_values(lon: float, lat: float, *, label: str) -> None:
 TravelMode = Literal["driving", "walking"]
 PublicCategory = Literal["history", "culture", "art", "scenic", "food", "civic", "mixed"]
 CategoryMatchType = Literal["primary", "secondary", "mixed"]
+DataSource = Literal["database", "fixture_fallback"]
 
 
 class RouteSuggestRequest(BaseModel):
@@ -187,6 +188,7 @@ class ExtendedPlaceContext(BaseModel):
 
 
 class RouteResult(BaseModel):
+    data_source: DataSource
     poi_id: str
     name: str
     primary_category: str
@@ -205,11 +207,13 @@ class RouteResult(BaseModel):
 
 
 class RouteSuggestResponse(BaseModel):
+    data_source: DataSource
     query_summary: QuerySummary
     results: list[RouteResult]
 
 
 class NearbyResult(BaseModel):
+    data_source: DataSource
     poi_id: str
     name: str
     primary_category: str
@@ -228,6 +232,7 @@ class NearbyResult(BaseModel):
 
 
 class NearbySuggestResponse(BaseModel):
+    data_source: DataSource
     query_summary: NearbyQuerySummary
     results: list[NearbyResult]
 
@@ -467,3 +472,29 @@ class AdminIngestStatusResponse(BaseModel):
     last_run_id: str | None
     status: str
     last_successful_run_at: datetime | None
+
+
+class QueryLogResultItem(BaseModel):
+    poi_id: str
+    score: float
+    score_breakdown: dict[str, float] | None = None
+    rank: int
+
+
+class QueryLogItem(BaseModel):
+    id: str
+    timestamp: datetime
+    endpoint: str
+    request_payload: dict[str, Any]
+    scoring_profile_version: str
+    data_source: DataSource
+    result_count: int
+    results: list[QueryLogResultItem]
+    duration_ms: int
+
+
+class QueryLogListResponse(BaseModel):
+    items: list[QueryLogItem]
+    total: int
+    limit: int
+    offset: int
