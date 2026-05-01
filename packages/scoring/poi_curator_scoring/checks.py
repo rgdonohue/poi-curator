@@ -177,10 +177,11 @@ def build_report(
     backend_mode: str | None = None,
     fixture_fallback_allowed: bool | None = None,
     database_target: str | None = None,
+    generated_at: datetime | None = None,
 ) -> CheckReport:
     expectation_runs = [run for run in runs if run.passed is not None]
     return CheckReport(
-        generated_at=datetime.now(UTC),
+        generated_at=generated_at or datetime.now(UTC),
         fixtures_path=str(fixtures_path) if fixtures_path is not None else None,
         backend_mode=backend_mode,
         fixture_fallback_allowed=fixture_fallback_allowed,

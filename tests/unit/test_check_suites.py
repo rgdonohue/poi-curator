@@ -11,6 +11,8 @@ from poi_curator_scoring.check_suites import (
 )
 from poi_curator_scoring.checks import CheckReport, CheckRun
 
+from scripts.run_check_suite import parse_frozen_time, resolve_output_dir
+
 
 def test_get_check_suite_finds_named_suite() -> None:
     suite = get_check_suite("rail-smoke")
@@ -34,6 +36,20 @@ def test_default_suite_run_dir_uses_timestamped_parent() -> None:
 
     assert out_dir.parent == Path("reports/check_runs")
     assert out_dir.name.endswith("Z")
+
+
+def test_run_check_suite_resolves_stable_run_id_and_frozen_time() -> None:
+    assert resolve_output_dir(None, "stable-run") == Path("reports/check_runs/stable-run")
+    assert resolve_output_dir(Path("custom/out"), "ignored") == Path("custom/out")
+    assert parse_frozen_time("2026-04-30T17:43:22Z") == datetime(
+        2026,
+        4,
+        30,
+        17,
+        43,
+        22,
+        tzinfo=UTC,
+    )
 
 
 def test_render_suite_index_markdown_includes_paths_and_counts() -> None:

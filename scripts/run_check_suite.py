@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from datetime import UTC, datetime
 from pathlib import Path
 
 from poi_curator_domain.db import get_session_factory
@@ -18,6 +19,7 @@ from poi_curator_scoring.check_suites import (
 )
 from poi_curator_scoring.checks import (
     DEFAULT_FIXTURES_PATH,
+    CheckReport,
     build_report,
     render_terminal_run,
     run_check_case,
@@ -34,7 +36,8 @@ def main() -> int:
         return 0
 
     suite_names = args.suite or ["core-product"]
-    out_dir = args.out_dir or default_suite_run_dir()
+    generated_at = parse_frozen_time(args.frozen_time)
+    out_dir = resolve_output_dir(args.out_dir, args.run_id)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     backend = get_database_scoring_backend(
@@ -58,6 +61,7 @@ def main() -> int:
                 backend_mode=backend_mode,
                 fixture_fallback_allowed=args.allow_fixture_fallback,
                 database_target=database_target,
+                generated_at=generated_at,
             )
             json_path = out_dir / f"{suite.name}.json"
             markdown_path = out_dir / f"{suite.name}.md"
@@ -87,6 +91,7 @@ def main() -> int:
                         backend_mode=backend_mode,
                         fixture_fallback_allowed=args.allow_fixture_fallback,
                         database_target=database_target,
+                        generated_at=generated_at,
                     )
                     write_report_files(
                         case_report,
@@ -128,6 +133,14 @@ def parse_args() -> argparse.Namespace:
         help="Output directory. Defaults to reports/check_runs/<timestamp>.",
     )
     parser.add_argument(
+        "--run-id",
+        help="Stable run directory name under reports/check_runs/ when --out-dir is omitted.",
+    )
+    parser.add_argument(
+        "--frozen-time",
+        help="ISO timestamp to use for generated_at fields.",
+    )
+    parser.add_argument(
         "--split-cases",
         action="store_true",
         help="Also write per-case JSON and Markdown files inside suite subdirectories.",
@@ -153,12 +166,30 @@ def parse_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def resolve_output_dir(out_dir: Path | None, run_id: str | None) -> Path:
+    if out_dir is not None:
+        return out_dir
+    if run_id is not None:
+        return Path("reports/check_runs") / run_id
+    return default_suite_run_dir()
+
+
+def parse_frozen_time(value: str | None) -> datetime | None:
+    if value is None:
+        return None
+    normalized = value[:-1] + "+00:00" if value.endswith("Z") else value
+    parsed = datetime.fromisoformat(normalized)
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=UTC)
+    return parsed.astimezone(UTC)
+
+
 def print_available_suites() -> None:
     for suite in list_check_suites():
         print(f"{suite.name}: {suite.description}")
 
 
-def print_suite_summary(*, suite_name: str, report: object, verbose: bool) -> None:
+def print_suite_summary(*, suite_name: str, report: CheckReport, verbose: bool) -> None:
     print(f"[suite] {suite_name}")
     print(f"runs={report.run_count}")
     print(f"passed={report.passed_count or 0}")

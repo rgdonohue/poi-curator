@@ -93,6 +93,13 @@ def test_render_terminal_run_and_write_report_files(tmp_path: Path) -> None:
     assert "POI Curator Check Report" in md_out.read_text(encoding="utf-8")
 
 
+def test_build_report_accepts_frozen_generated_at() -> None:
+    frozen = datetime(2026, 4, 30, 17, 43, 22, tzinfo=UTC)
+    report = build_report([], generated_at=frozen)
+
+    assert report.generated_at == frozen
+
+
 def test_write_review_files_defaults_to_timestamped_json(tmp_path: Path) -> None:
     review = ReviewArtifact(
         case_id="nearby-railyard-rail",
