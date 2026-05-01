@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>poi-curator - admin</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <link rel="stylesheet" href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" />
+    <link rel="stylesheet" href="/admin/admin.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <span class="brand-name">poi-curator</span>
+          <span class="brand-section">admin</span>
+        </div>
+        <nav class="topnav" aria-label="Admin views">
+          <button type="button" class="nav-button is-active" data-view="poi-list">POI List</button>
+          <button type="button" class="nav-button" data-view="poi-detail">POI Detail</button>
+          <button type="button" class="nav-button" data-view="map-browser">Map Browser</button>
+          <button type="button" class="nav-button" data-view="query-logs">Query Logs</button>
+          <button type="button" class="nav-button" data-view="status">Health & Source</button>
+        </nav>
+        <div class="topbar-actions">
+          <span id="health-badge" class="health-badge unknown">unknown</span>
+          <button type="button" id="settings-toggle" class="secondary-button">Settings</button>
+        </div>
+      </header>
+
+      <section id="settings-panel" class="settings-panel hidden" aria-label="Admin settings">
+        <div>
+          <h2>Admin Key</h2>
+          <p>
+            Paste the admin key once. It is stored in localStorage and sent as
+            X-POI-Curator-Admin-Key on admin requests.
+          </p>
+        </div>
+        <form id="admin-key-form" class="key-form">
+          <label class="field key-field">
+            <span>Admin key</span>
+            <input
+              id="admin-key-input"
+              type="password"
+              autocomplete="off"
+              placeholder="Paste key"
+            />
+          </label>
+          <button type="submit" class="primary-button">Save key</button>
+          <button type="button" id="clear-key-button" class="secondary-button">Clear key</button>
+          <span id="key-status" class="inline-status"></span>
+        </form>
+      </section>
+
+      <main class="workspace">
+        <section id="view-poi-list" class="view is-active" aria-labelledby="poi-list-title">
+          <div class="view-header">
+            <div>
+              <h1 id="poi-list-title">POI List</h1>
+              <p>Read-only table for curated POIs once a paginated list endpoint exists.</p>
+            </div>
+            <button type="button" class="primary-button" id="poi-list-refresh" disabled>
+              Refresh list
+            </button>
+          </div>
+
+          <div class="split-layout list-layout">
+            <aside class="filter-panel">
+              <h2>Filters</h2>
+              <label class="field">
+                <span>Search name or aliases</span>
+                <input id="poi-search" type="search" placeholder="Search" disabled />
+              </label>
+              <label class="field">
+                <span>Category</span>
+                <select id="filter-category" disabled></select>
+              </label>
+              <label class="field">
+                <span>Review state</span>
+                <select id="filter-review-state" disabled>
+                  <option value="">Any</option>
+                  <option value="needs_review">Needs review</option>
+                  <option value="reviewed">Reviewed</option>
+                  <option value="suppressed">Suppressed</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Source</span>
+                <input id="filter-source" type="text" placeholder="OSM, Wikidata, NRHP" disabled />
+              </label>
+              <label class="field">
+                <span>Theme</span>
+                <select id="filter-theme" disabled>
+                  <option value="">Any</option>
+                  <option value="water">Water</option>
+                  <option value="rail">Rail</option>
+                  <option value="public_memory">Public memory</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Has diagnostics</span>
+                <select id="filter-diagnostics" disabled>
+                  <option value="">Any</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Has editorial overrides</span>
+                <select id="filter-overrides" disabled>
+                  <option value="">Any</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+            </aside>
+
+            <section class="content-panel">
+              <div class="endpoint-needed">
+                <h2>Endpoint needed</h2>
+                <p>
+                  This view needs a paginated, filtered POI list endpoint. It is documented in
+                  apps/admin/NEEDED_ENDPOINTS.md and is intentionally not added in this pass.
+                </p>
+              </div>
+              <div class="table-shell">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>poi_id</th>
+                      <th>name</th>
+                      <th>category</th>
+                      <th>review_state</th>
+                      <th>source</th>
+                      <th>themes</th>
+                      <th>last_updated</th>
+                    </tr>
+                  </thead>
+                  <tbody id="poi-list-body">
+                    <tr>
+                      <td colspan="7" class="empty-cell">No list endpoint is available yet.</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <div class="pager">
+                <button type="button" class="secondary-button" disabled>Previous</button>
+                <span>50 per page</span>
+                <button type="button" class="secondary-button" disabled>Next</button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-poi-detail" class="view" aria-labelledby="poi-detail-title">
+          <div class="view-header">
+            <div>
+              <h1 id="poi-detail-title">POI Detail</h1>
+              <p>Inspect public canonical POI fields and exposed evidence for a known POI id.</p>
+            </div>
+            <form id="poi-detail-form" class="lookup-form">
+              <input id="poi-id-input" type="text" placeholder="POI id" />
+              <button type="submit" class="primary-button">Load</button>
+            </form>
+          </div>
+          <div id="poi-detail-content" class="detail-grid">
+            <div class="empty-state">
+              Open a POI id from query logs, or paste a POI id above.
+            </div>
+          </div>
+        </section>
+
+        <section id="view-map-browser" class="view map-view" aria-labelledby="map-browser-title">
+          <div class="map-browser-shell">
+            <aside class="map-sidebar">
+              <div class="map-sidebar-header">
+                <h1 id="map-browser-title">Map Browser</h1>
+                <p>Clustered POI map once the active-POI endpoint exists.</p>
+              </div>
+              <div class="filter-stack">
+                <label class="field">
+                  <span>Category</span>
+                  <select id="map-filter-category" disabled></select>
+                </label>
+                <label class="field">
+                  <span>Review state</span>
+                  <select disabled>
+                    <option>Any</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Source</span>
+                  <input type="text" disabled placeholder="Any" />
+                </label>
+                <label class="field">
+                  <span>Theme</span>
+                  <select disabled>
+                    <option>Any</option>
+                  </select>
+                </label>
+              </div>
+              <div class="endpoint-needed compact">
+                <h2>Endpoint needed</h2>
+                <p>
+                  The map needs coordinates and review state for all active POIs. No permitted
+                  endpoint exposes that collection yet.
+                </p>
+              </div>
+              <div id="map-detail-panel" class="side-detail">
+                <div class="empty-state">Click a marker to inspect a POI.</div>
+              </div>
+            </aside>
+            <div id="map-browser-map" class="map-canvas"></div>
+          </div>
+        </section>
+
+        <section id="view-query-logs" class="view" aria-labelledby="query-log-title">
+          <div class="view-header">
+            <div>
+              <h1 id="query-log-title">Query Log Browser</h1>
+              <p>Recent suggestion requests captured by the admin query-log endpoint.</p>
+            </div>
+            <button type="button" id="query-log-refresh" class="primary-button">Refresh</button>
+          </div>
+
+          <form id="query-log-filters" class="query-filter-bar">
+            <label class="field">
+              <span>Endpoint</span>
+              <input id="log-endpoint" type="text" placeholder="route_suggest" />
+            </label>
+            <label class="field">
+              <span>Start</span>
+              <input id="log-start" type="datetime-local" />
+            </label>
+            <label class="field">
+              <span>End</span>
+              <input id="log-end" type="datetime-local" />
+            </label>
+            <label class="field">
+              <span>Min results</span>
+              <input id="log-min-results" type="number" min="0" />
+            </label>
+            <label class="field">
+              <span>Max results</span>
+              <input id="log-max-results" type="number" min="0" />
+            </label>
+            <button type="submit" class="secondary-button">Apply</button>
+          </form>
+
+          <div id="query-log-status" class="inline-message"></div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>endpoint</th>
+                  <th>timestamp</th>
+                  <th>result_count</th>
+                  <th>data_source</th>
+                  <th>duration_ms</th>
+                </tr>
+              </thead>
+              <tbody id="query-log-body">
+                <tr>
+                  <td colspan="5" class="empty-cell">Enter an admin key, then refresh.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="pager">
+            <button type="button" id="query-log-prev" class="secondary-button">Previous</button>
+            <span id="query-log-page">0 logs</span>
+            <button type="button" id="query-log-next" class="secondary-button">Next</button>
+          </div>
+        </section>
+
+        <section id="view-status" class="view" aria-labelledby="status-title">
+          <div class="view-header">
+            <div>
+              <h1 id="status-title">Health & Source</h1>
+              <p>Raw public health and config responses used by the admin viewer.</p>
+            </div>
+            <button type="button" id="status-refresh" class="primary-button">Refresh</button>
+          </div>
+          <div class="status-grid">
+            <section class="raw-panel">
+              <h2>/v1/health</h2>
+              <pre id="health-raw">{}</pre>
+            </section>
+            <section class="raw-panel">
+              <h2>/v1/config</h2>
+              <pre id="config-raw">{}</pre>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script defer src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script defer src="/admin/admin.js"></script>
+  </body>
+</html>

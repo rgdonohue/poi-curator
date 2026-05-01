@@ -18,6 +18,7 @@ from poi_curator_api.dependencies import lifespan
 def create_app() -> FastAPI:
     settings = get_settings()
     static_dir = Path(__file__).resolve().parent / "static"
+    admin_dir = Path(__file__).resolve().parents[2] / "admin"
     logging.basicConfig(
         level=getattr(logging, settings.log_level.upper(), logging.INFO),
         format="%(asctime)s %(levelname)s %(name)s %(message)s",
@@ -48,12 +49,19 @@ def create_app() -> FastAPI:
             "service": "poi-curator",
             "docs_url": "/docs",
             "map_test_url": "/map-test",
+            "admin_url": "/admin",
             "environment": settings.env,
         }
 
     @app.get("/map-test", tags=["meta"])
     def map_test() -> FileResponse:
         return FileResponse(static_dir / "map-test" / "index.html")
+
+    @app.get("/admin", tags=["meta"])
+    def admin_viewer() -> FileResponse:
+        return FileResponse(admin_dir / "index.html")
+
+    app.mount("/admin", StaticFiles(directory=admin_dir, html=True), name="admin")
 
     return app
 
