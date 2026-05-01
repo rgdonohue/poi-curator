@@ -62,9 +62,9 @@
           <div class="view-header">
             <div>
               <h1 id="poi-list-title">POI List</h1>
-              <p>Read-only table for curated POIs once a paginated list endpoint exists.</p>
+              <p>Read-only table for curated POIs from the admin list endpoint.</p>
             </div>
-            <button type="button" class="primary-button" id="poi-list-refresh" disabled>
+            <button type="button" class="primary-button" id="poi-list-refresh">
               Refresh list
             </button>
           </div>
@@ -74,15 +74,15 @@
               <h2>Filters</h2>
               <label class="field">
                 <span>Search name or aliases</span>
-                <input id="poi-search" type="search" placeholder="Search" disabled />
+                <input id="poi-search" type="search" placeholder="Search" />
               </label>
               <label class="field">
                 <span>Category</span>
-                <select id="filter-category" disabled></select>
+                <select id="filter-category"></select>
               </label>
               <label class="field">
                 <span>Review state</span>
-                <select id="filter-review-state" disabled>
+                <select id="filter-review-state">
                   <option value="">Any</option>
                   <option value="needs_review">Needs review</option>
                   <option value="reviewed">Reviewed</option>
@@ -91,11 +91,11 @@
               </label>
               <label class="field">
                 <span>Source</span>
-                <input id="filter-source" type="text" placeholder="OSM, Wikidata, NRHP" disabled />
+                <input id="filter-source" type="text" placeholder="OSM, Wikidata, NRHP" />
               </label>
               <label class="field">
                 <span>Theme</span>
-                <select id="filter-theme" disabled>
+                <select id="filter-theme">
                   <option value="">Any</option>
                   <option value="water">Water</option>
                   <option value="rail">Rail</option>
@@ -103,8 +103,15 @@
                 </select>
               </label>
               <label class="field">
+                <span>Theme match</span>
+                <select id="filter-theme-match">
+                  <option value="any">Any</option>
+                  <option value="all">All</option>
+                </select>
+              </label>
+              <label class="field">
                 <span>Has diagnostics</span>
-                <select id="filter-diagnostics" disabled>
+                <select id="filter-diagnostics">
                   <option value="">Any</option>
                   <option value="true">Yes</option>
                   <option value="false">No</option>
@@ -112,8 +119,15 @@
               </label>
               <label class="field">
                 <span>Has editorial overrides</span>
-                <select id="filter-overrides" disabled>
+                <select id="filter-overrides">
                   <option value="">Any</option>
+                  <option value="true">Yes</option>
+                  <option value="false">No</option>
+                </select>
+              </label>
+              <label class="field">
+                <span>Active only</span>
+                <select id="filter-active-only">
                   <option value="true">Yes</option>
                   <option value="false">No</option>
                 </select>
@@ -121,13 +135,7 @@
             </aside>
 
             <section class="content-panel">
-              <div class="endpoint-needed">
-                <h2>Endpoint needed</h2>
-                <p>
-                  This view needs a paginated, filtered POI list endpoint. It is documented in
-                  apps/admin/NEEDED_ENDPOINTS.md and is intentionally not added in this pass.
-                </p>
-              </div>
+              <div id="poi-list-status" class="inline-message"></div>
               <div class="table-shell">
                 <table>
                   <thead>
@@ -149,9 +157,9 @@
                 </table>
               </div>
               <div class="pager">
-                <button type="button" class="secondary-button" disabled>Previous</button>
-                <span>50 per page</span>
-                <button type="button" class="secondary-button" disabled>Next</button>
+                <button type="button" id="poi-list-prev" class="secondary-button">Previous</button>
+                <span id="poi-list-page">50 per page</span>
+                <button type="button" id="poi-list-next" class="secondary-button">Next</button>
               </div>
             </section>
           </div>
@@ -161,7 +169,7 @@
           <div class="view-header">
             <div>
               <h1 id="poi-detail-title">POI Detail</h1>
-              <p>Inspect public canonical POI fields and exposed evidence for a known POI id.</p>
+              <p>Inspect canonical fields, evidence, aliases, diagnostics, and overrides.</p>
             </div>
             <form id="poi-detail-form" class="lookup-form">
               <input id="poi-id-input" type="text" placeholder="POI id" />
@@ -180,37 +188,73 @@
             <aside class="map-sidebar">
               <div class="map-sidebar-header">
                 <h1 id="map-browser-title">Map Browser</h1>
-                <p>Clustered POI map once the active-POI endpoint exists.</p>
+                <p>Clustered POI map from the capped admin map endpoint.</p>
               </div>
               <div class="filter-stack">
                 <label class="field">
+                  <span>Search name or aliases</span>
+                  <input id="map-filter-search" type="search" placeholder="Search" />
+                </label>
+                <label class="field">
                   <span>Category</span>
-                  <select id="map-filter-category" disabled></select>
+                  <select id="map-filter-category"></select>
                 </label>
                 <label class="field">
                   <span>Review state</span>
-                  <select disabled>
-                    <option>Any</option>
+                  <select id="map-filter-review-state">
+                    <option value="">Any</option>
+                    <option value="needs_review">Needs review</option>
+                    <option value="reviewed">Reviewed</option>
+                    <option value="suppressed">Suppressed</option>
+                    <option value="stale">Stale</option>
                   </select>
                 </label>
                 <label class="field">
                   <span>Source</span>
-                  <input type="text" disabled placeholder="Any" />
+                  <input id="map-filter-source" type="text" placeholder="Any" />
                 </label>
                 <label class="field">
                   <span>Theme</span>
-                  <select disabled>
-                    <option>Any</option>
+                  <select id="map-filter-theme">
+                    <option value="">Any</option>
+                    <option value="water">Water</option>
+                    <option value="rail">Rail</option>
+                    <option value="public_memory">Public memory</option>
                   </select>
                 </label>
+                <label class="field">
+                  <span>Theme match</span>
+                  <select id="map-filter-theme-match">
+                    <option value="any">Any</option>
+                    <option value="all">All</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Has diagnostics</span>
+                  <select id="map-filter-diagnostics">
+                    <option value="">Any</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Has editorial overrides</span>
+                  <select id="map-filter-overrides">
+                    <option value="">Any</option>
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <label class="field">
+                  <span>Active only</span>
+                  <select id="map-filter-active-only">
+                    <option value="true">Yes</option>
+                    <option value="false">No</option>
+                  </select>
+                </label>
+                <button type="button" id="map-refresh" class="primary-button">Refresh map</button>
               </div>
-              <div class="endpoint-needed compact">
-                <h2>Endpoint needed</h2>
-                <p>
-                  The map needs coordinates and review state for all active POIs. No permitted
-                  endpoint exposes that collection yet.
-                </p>
-              </div>
+              <div id="map-status" class="inline-message"></div>
               <div id="map-detail-panel" class="side-detail">
                 <div class="empty-state">Click a marker to inspect a POI.</div>
               </div>

@@ -268,6 +268,29 @@ class AdminPOIItem(BaseModel):
     notes: str
 
 
+class AdminPOIListItem(BaseModel):
+    poi_id: str
+    name: str
+    primary_category: str
+    secondary_categories: list[str]
+    review_state: str
+    source: str
+    themes: list[str]
+    last_updated: datetime
+    coordinates: list[float] | None = None
+    has_diagnostics: bool
+    has_editorial_overrides: bool
+    is_active: bool
+    stale_since: datetime | None = None
+
+
+class AdminPOIListResponse(BaseModel):
+    items: list[AdminPOIListItem]
+    total: int
+    limit: int
+    offset: int
+
+
 class AdminPOIAliasItem(BaseModel):
     alias_name: str
     normalized_alias: str
@@ -301,6 +324,102 @@ class AdminPOIEvidenceResponse(BaseModel):
     aliases: list[AdminPOIAliasItem]
     evidence: list[AdminPOIEvidenceItem]
     themes: list[POIThemeItem] = Field(default_factory=list)
+
+
+class AdminPOIDetailEvidenceItem(BaseModel):
+    evidence_id: int
+    source_id: str
+    source_name: str | None = None
+    source_type: str | None = None
+    trust_class: str | None = None
+    evidence_type: str
+    label: str | None = None
+    text: str | None = None
+    url: str | None = None
+    external_record_id: str | None = None
+    confidence: float
+    match_method: str | None = None
+    observed_at: datetime
+    raw_payload: dict[str, Any] | None = None
+
+
+class AdminPOIEditorialOverrideItem(BaseModel):
+    value: Any
+    source_value: Any = None
+    updated_at: datetime | None = None
+    updated_by: str | None = None
+
+
+class AdminPOIDetailMatchDiagnosticItem(BaseModel):
+    id: int
+    source_id: str
+    source_name: str | None = None
+    source_type: str | None = None
+    external_record_id: str | None = None
+    external_name: str
+    best_candidate_poi_id: str | None = None
+    best_candidate_name: str | None = None
+    resolved_poi_id: str | None = None
+    resolved_poi_name: str | None = None
+    best_similarity: float | None = None
+    match_strategy: str | None = None
+    resolution_method: str | None = None
+    why_not_auto_linked: str
+    state: str
+    reviewer_notes: str | None = None
+    reviewed_at: datetime | None = None
+    reviewed_by: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class AdminPOIDetailResponse(BaseModel):
+    poi_id: str
+    canonical: POIDetailResponse
+    editorial_overrides: dict[str, AdminPOIEditorialOverrideItem]
+    aliases: list[AdminPOIAliasItem]
+    evidence: list[AdminPOIDetailEvidenceItem]
+    themes: list[POIThemeItem] = Field(default_factory=list)
+    match_diagnostics: list[AdminPOIDetailMatchDiagnosticItem] = Field(default_factory=list)
+    external_links: dict[str, str]
+    last_updated: datetime
+
+
+class AdminPOIMapFeatureGeometry(BaseModel):
+    type: Literal["Point"] = "Point"
+    coordinates: list[float]
+
+
+class AdminPOIMapFeatureProperties(BaseModel):
+    poi_id: str
+    name: str
+    primary_category: str
+    review_state: str
+    source: str
+    themes: list[str]
+    has_diagnostics: bool
+    has_editorial_overrides: bool
+    is_active: bool
+    stale_since: datetime | None = None
+
+
+class AdminPOIMapFeature(BaseModel):
+    type: Literal["Feature"] = "Feature"
+    geometry: AdminPOIMapFeatureGeometry
+    properties: AdminPOIMapFeatureProperties
+
+
+class AdminPOIMapFeatureCollection(BaseModel):
+    type: Literal["FeatureCollection"] = "FeatureCollection"
+    features: list[AdminPOIMapFeature]
+
+
+class AdminPOIMapResponse(BaseModel):
+    feature_collection: AdminPOIMapFeatureCollection
+    total_matching: int
+    returned: int
+    truncated: bool
+    limit: int
 
 
 class AdminThemeSummaryItem(BaseModel):

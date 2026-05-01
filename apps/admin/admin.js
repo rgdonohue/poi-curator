@@ -11,6 +11,10 @@ const state = {
   health: null,
   config: null,
   selectedPoi: null,
+  poiList: [],
+  poiListTotal: 0,
+  poiListOffset: 0,
+  mapPayload: null,
   queryLogs: [],
   queryLogTotal: 0,
   queryLogOffset: 0,
@@ -46,7 +50,31 @@ function cacheElements() {
   els.clearKeyButton = document.getElementById("clear-key-button");
   els.keyStatus = document.getElementById("key-status");
   els.filterCategory = document.getElementById("filter-category");
+  els.poiSearch = document.getElementById("poi-search");
+  els.filterReviewState = document.getElementById("filter-review-state");
+  els.filterSource = document.getElementById("filter-source");
+  els.filterTheme = document.getElementById("filter-theme");
+  els.filterThemeMatch = document.getElementById("filter-theme-match");
+  els.filterDiagnostics = document.getElementById("filter-diagnostics");
+  els.filterOverrides = document.getElementById("filter-overrides");
+  els.filterActiveOnly = document.getElementById("filter-active-only");
+  els.poiListRefresh = document.getElementById("poi-list-refresh");
+  els.poiListStatus = document.getElementById("poi-list-status");
+  els.poiListBody = document.getElementById("poi-list-body");
+  els.poiListPrev = document.getElementById("poi-list-prev");
+  els.poiListNext = document.getElementById("poi-list-next");
+  els.poiListPage = document.getElementById("poi-list-page");
   els.mapFilterCategory = document.getElementById("map-filter-category");
+  els.mapFilterSearch = document.getElementById("map-filter-search");
+  els.mapFilterReviewState = document.getElementById("map-filter-review-state");
+  els.mapFilterSource = document.getElementById("map-filter-source");
+  els.mapFilterTheme = document.getElementById("map-filter-theme");
+  els.mapFilterThemeMatch = document.getElementById("map-filter-theme-match");
+  els.mapFilterDiagnostics = document.getElementById("map-filter-diagnostics");
+  els.mapFilterOverrides = document.getElementById("map-filter-overrides");
+  els.mapFilterActiveOnly = document.getElementById("map-filter-active-only");
+  els.mapRefresh = document.getElementById("map-refresh");
+  els.mapStatus = document.getElementById("map-status");
   els.poiDetailForm = document.getElementById("poi-detail-form");
   els.poiIdInput = document.getElementById("poi-id-input");
   els.poiDetailContent = document.getElementById("poi-detail-content");
@@ -84,12 +112,21 @@ function bindEvents() {
     localStorage.setItem(ADMIN_KEY_STORAGE, key);
     els.adminKeyInput.value = "";
     updateKeyStatus();
+    void loadPoiList();
+    void loadQueryLogs();
+    void loadMapPois();
   });
 
   els.clearKeyButton.addEventListener("click", () => {
     localStorage.removeItem(ADMIN_KEY_STORAGE);
     els.adminKeyInput.value = "";
     updateKeyStatus();
+    state.poiList = [];
+    state.queryLogs = [];
+    state.mapPayload = null;
+    renderPoiList();
+    renderQueryLogs();
+    updateMapSource(EMPTY_COLLECTION);
   });
 
   els.poiDetailForm.addEventListener("submit", (event) => {
@@ -97,6 +134,80 @@ function bindEvents() {
     const poiId = els.poiIdInput.value.trim();
     if (poiId) {
       void loadPoiDetail(poiId);
+    }
+  });
+
+  els.poiListRefresh.addEventListener("click", () => {
+    state.poiListOffset = 0;
+    void loadPoiList();
+  });
+
+  [
+    els.poiSearch,
+    els.filterCategory,
+    els.filterReviewState,
+    els.filterSource,
+    els.filterTheme,
+    els.filterThemeMatch,
+    els.filterDiagnostics,
+    els.filterOverrides,
+    els.filterActiveOnly,
+  ].forEach((element) => {
+    element.addEventListener("change", () => {
+      state.poiListOffset = 0;
+      void loadPoiList();
+    });
+  });
+
+  els.poiSearch.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      state.poiListOffset = 0;
+      void loadPoiList();
+    }
+  });
+
+  els.poiListPrev.addEventListener("click", () => {
+    state.poiListOffset = Math.max(0, state.poiListOffset - PAGE_SIZE);
+    void loadPoiList();
+  });
+
+  els.poiListNext.addEventListener("click", () => {
+    if (state.poiListOffset + PAGE_SIZE < state.poiListTotal) {
+      state.poiListOffset += PAGE_SIZE;
+      void loadPoiList();
+    }
+  });
+
+  els.poiListBody.addEventListener("click", (event) => {
+    const row = event.target.closest("[data-poi-row-id]");
+    if (row) {
+      void loadPoiDetail(row.dataset.poiRowId);
+    }
+  });
+
+  els.mapRefresh.addEventListener("click", () => {
+    void loadMapPois();
+  });
+
+  [
+    els.mapFilterCategory,
+    els.mapFilterSearch,
+    els.mapFilterReviewState,
+    els.mapFilterSource,
+    els.mapFilterTheme,
+    els.mapFilterThemeMatch,
+    els.mapFilterDiagnostics,
+    els.mapFilterOverrides,
+    els.mapFilterActiveOnly,
+  ].forEach((element) => {
+    element.addEventListener("change", () => {
+      void loadMapPois();
+    });
+  });
+
+  els.mapFilterSearch.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      void loadMapPois();
     }
   });
 
@@ -144,7 +255,9 @@ function bindEvents() {
 async function boot() {
   await Promise.all([loadStatus(), loadCategories()]);
   if (hasAdminKey()) {
+    void loadPoiList();
     void loadQueryLogs();
+    void loadMapPois();
   }
 }
 
@@ -160,6 +273,9 @@ function showView(view) {
   if (view === "map-browser") {
     initMapBrowser();
     setTimeout(() => state.mapBrowser?.resize(), 0);
+    if (hasAdminKey()) {
+      void loadMapPois();
+    }
   }
 }
 
@@ -258,13 +374,97 @@ function renderHealthBadge() {
   els.healthBadge.className = `health-badge ${source}`;
 }
 
+async function loadPoiList() {
+  if (!hasAdminKey()) {
+    els.poiListStatus.textContent = "Enter an admin key, then refresh.";
+    renderPoiList();
+    return;
+  }
+  els.poiListStatus.textContent = "Loading POIs...";
+  try {
+    const payload = await requestJson("/v1/admin/pois", {
+      admin: true,
+      params: poiListParams(),
+    });
+    state.poiList = payload.items || [];
+    state.poiListTotal = payload.total || 0;
+    state.poiListOffset = payload.offset || 0;
+    els.poiListStatus.textContent = "";
+    renderPoiList();
+  } catch (error) {
+    state.poiList = [];
+    state.poiListTotal = 0;
+    els.poiListStatus.textContent = error.message;
+    renderPoiList();
+  }
+}
+
+function poiListParams() {
+  return {
+    search: els.poiSearch.value.trim(),
+    category: els.filterCategory.value,
+    review_state: els.filterReviewState.value,
+    source: els.filterSource.value.trim(),
+    theme: els.filterTheme.value,
+    theme_match: els.filterThemeMatch.value,
+    has_diagnostics: els.filterDiagnostics.value,
+    has_editorial_overrides: els.filterOverrides.value,
+    active_only: els.filterActiveOnly.value,
+    limit: PAGE_SIZE,
+    offset: state.poiListOffset,
+  };
+}
+
+function renderPoiList() {
+  els.poiListBody.innerHTML = "";
+  if (!state.poiList.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 7;
+    cell.className = "empty-cell";
+    cell.textContent = hasAdminKey() ? "No POIs match the current filters." : "Enter an admin key.";
+    row.appendChild(cell);
+    els.poiListBody.appendChild(row);
+  }
+
+  state.poiList.forEach((poi) => {
+    const row = document.createElement("tr");
+    row.className = "is-clickable";
+    row.dataset.poiRowId = poi.poi_id;
+    row.append(
+      tableCell(poi.poi_id),
+      tableCell(poi.name),
+      tableCell(poi.primary_category),
+      tableCell(poi.review_state),
+      tableCell(poi.source),
+      tableCell((poi.themes || []).join(", ")),
+      tableCell(formatDate(poi.last_updated))
+    );
+    els.poiListBody.appendChild(row);
+  });
+
+  const start = state.poiListTotal ? state.poiListOffset + 1 : 0;
+  const end = Math.min(state.poiListOffset + PAGE_SIZE, state.poiListTotal);
+  els.poiListPage.textContent = `${start}-${end} of ${state.poiListTotal}`;
+  els.poiListPrev.disabled = state.poiListOffset <= 0;
+  els.poiListNext.disabled = state.poiListOffset + PAGE_SIZE >= state.poiListTotal;
+}
+
+function tableCell(value) {
+  const cell = document.createElement("td");
+  cell.textContent = value ?? "";
+  return cell;
+}
+
 async function loadPoiDetail(poiId) {
   showView("poi-detail");
   els.poiIdInput.value = poiId;
   destroyDetailMap();
   els.poiDetailContent.innerHTML = '<div class="empty-state">Loading POI detail...</div>';
   try {
-    state.selectedPoi = await requestJson(`/v1/poi/${encodeURIComponent(poiId)}`);
+    state.selectedPoi = await requestJson(`/v1/admin/pois/${encodeURIComponent(poiId)}`, {
+      admin: true,
+    });
     renderPoiDetail(state.selectedPoi, els.poiDetailContent, { includeMap: true });
   } catch (error) {
     els.poiDetailContent.innerHTML = "";
@@ -281,32 +481,39 @@ async function openPoiFromLink(poiId) {
 
 function renderPoiDetail(poi, container, options = {}) {
   container.innerHTML = "";
+  const canonical = poi.canonical || poi;
+  const adminDetail = poi.canonical ? poi : null;
 
   const left = document.createElement("div");
   left.className = "detail-column";
   const right = document.createElement("div");
   right.className = "detail-column";
 
-  left.appendChild(renderCanonicalFields(poi));
-  left.appendChild(renderEvidence(poi.evidence || []));
-  left.appendChild(renderThemes(poi.themes || []));
+  left.appendChild(renderCanonicalFields(canonical, adminDetail?.editorial_overrides || {}));
+  left.appendChild(renderEvidence(adminDetail?.evidence || canonical.evidence || []));
+  left.appendChild(renderThemes(adminDetail?.themes || canonical.themes || []));
 
   right.appendChild(renderExternalLinks(poi));
-  right.appendChild(renderAliasesNeeded());
-  right.appendChild(renderDiagnosticsNeeded());
+  right.appendChild(renderAliases(adminDetail?.aliases || []));
+  right.appendChild(renderDiagnostics(adminDetail?.match_diagnostics || []));
   if (options.includeMap) {
-    right.appendChild(renderDetailMapCard(poi));
+    right.appendChild(renderDetailMapCard(canonical));
   }
 
-  container.className = "detail-grid";
-  container.append(left, right);
+  if (options.compact) {
+    container.className = "side-detail detail-column";
+    container.append(...left.childNodes, ...right.childNodes);
+  } else {
+    container.className = "detail-grid";
+    container.append(left, right);
+  }
 
   if (options.includeMap) {
-    initDetailMap(poi.coordinates);
+    initDetailMap(canonical.coordinates);
   }
 }
 
-function renderCanonicalFields(poi) {
+function renderCanonicalFields(poi, overrides = {}) {
   const card = detailCard("Canonical Fields");
   const table = document.createElement("div");
   table.className = "field-table";
@@ -329,23 +536,25 @@ function renderCanonicalFields(poi) {
     const valueCell = document.createElement("div");
     valueCell.className = "field-value";
     valueCell.appendChild(renderValue(value));
-    const override = getOverrideInfo(poi, name);
+    const override = overrides[name] || getOverrideInfo(poi, name);
     if (override) {
       const badge = document.createElement("span");
       badge.className = "edited-badge";
-      badge.title = `Original source value: ${formatCompact(override.original)}`;
+      badge.title = `Original source value: ${formatCompact(
+        override.source_value ?? override.original
+      )}`;
       badge.textContent = "edited";
       valueCell.appendChild(badge);
     }
     table.append(nameCell, valueCell);
   });
   card.appendChild(table);
-  if (!hasOverrideMetadata(poi)) {
+  if (!Object.keys(overrides).length && !hasOverrideMetadata(poi)) {
     const note = document.createElement("p");
     note.className = "empty-state";
     note.style.marginTop = "10px";
     note.textContent =
-      "Editorial override metadata is not exposed by the current POI detail endpoint.";
+      "No editorial overrides are recorded for the exposed canonical fields.";
     card.appendChild(note);
   }
   return card;
@@ -461,19 +670,51 @@ function renderExternalLinks(poi) {
   return card;
 }
 
-function renderAliasesNeeded() {
+function renderAliases(aliases) {
   const card = detailCard("Aliases");
-  card.appendChild(
-    emptyState("Aliases require a read-only admin detail endpoint or an allowed aliases endpoint.")
-  );
+  if (!aliases.length) {
+    card.appendChild(emptyState("No aliases recorded."));
+    return card;
+  }
+  aliases.forEach((alias) => {
+    const item = document.createElement("div");
+    item.className = "evidence-group";
+    item.textContent = [
+      alias.alias_name,
+      alias.alias_type,
+      alias.source,
+      alias.is_preferred ? "preferred" : null,
+    ]
+      .filter(Boolean)
+      .join(" - ");
+    card.appendChild(item);
+  });
   return card;
 }
 
-function renderDiagnosticsNeeded() {
+function renderDiagnostics(diagnostics) {
   const card = detailCard("Match Diagnostics");
-  card.appendChild(
-    emptyState("Diagnostics and reviewer notes are not exposed by the permitted detail endpoint.")
-  );
+  if (!diagnostics.length) {
+    card.appendChild(emptyState("No match diagnostics recorded."));
+    return card;
+  }
+  diagnostics.forEach((diagnostic) => {
+    const item = document.createElement("section");
+    item.className = "diagnostic-item";
+    const heading = document.createElement("h3");
+    heading.textContent = `${diagnostic.source_id} - ${diagnostic.state}`;
+    const body = document.createElement("p");
+    body.textContent = [
+      diagnostic.external_name,
+      diagnostic.best_candidate_name,
+      diagnostic.reviewer_notes,
+      diagnostic.why_not_auto_linked,
+    ]
+      .filter(Boolean)
+      .join(" | ");
+    item.append(heading, body);
+    card.appendChild(item);
+  });
   return card;
 }
 
@@ -576,7 +817,106 @@ function initMapBrowser() {
         ],
       },
     });
+    state.mapBrowser.on("click", "poi-points", (event) => {
+      const poiId = event.features?.[0]?.properties?.poi_id;
+      if (poiId) {
+        void loadMapPoiDetail(poiId);
+      }
+    });
+    state.mapBrowser.on("click", "poi-clusters", (event) => {
+      const feature = event.features?.[0];
+      const clusterId = feature?.properties?.cluster_id;
+      const source = state.mapBrowser.getSource("pois");
+      if (clusterId === undefined || !source?.getClusterExpansionZoom) {
+        return;
+      }
+      source.getClusterExpansionZoom(clusterId, (error, zoom) => {
+        if (error) {
+          return;
+        }
+        state.mapBrowser.easeTo({
+          center: feature.geometry.coordinates,
+          zoom,
+        });
+      });
+    });
+    state.mapBrowser.on("mouseenter", "poi-points", () => {
+      state.mapBrowser.getCanvas().style.cursor = "pointer";
+    });
+    state.mapBrowser.on("mouseleave", "poi-points", () => {
+      state.mapBrowser.getCanvas().style.cursor = "";
+    });
+    updateMapSource(state.mapPayload?.feature_collection || EMPTY_COLLECTION);
   });
+}
+
+async function loadMapPois() {
+  if (!hasAdminKey()) {
+    els.mapStatus.textContent = "Enter an admin key, then refresh.";
+    updateMapSource(EMPTY_COLLECTION);
+    return;
+  }
+  els.mapStatus.textContent = "Loading map POIs...";
+  try {
+    const payload = await requestJson("/v1/admin/pois/map", {
+      admin: true,
+      params: mapParams(),
+    });
+    state.mapPayload = payload;
+    updateMapSource(payload.feature_collection || EMPTY_COLLECTION);
+    renderMapStatus(payload);
+  } catch (error) {
+    state.mapPayload = null;
+    updateMapSource(EMPTY_COLLECTION);
+    els.mapStatus.textContent = error.message;
+  }
+}
+
+function mapParams() {
+  return {
+    search: els.mapFilterSearch.value.trim(),
+    category: els.mapFilterCategory.value,
+    review_state: els.mapFilterReviewState.value,
+    source: els.mapFilterSource.value.trim(),
+    theme: els.mapFilterTheme.value,
+    theme_match: els.mapFilterThemeMatch.value,
+    has_diagnostics: els.mapFilterDiagnostics.value,
+    has_editorial_overrides: els.mapFilterOverrides.value,
+    active_only: els.mapFilterActiveOnly.value,
+    limit: 2000,
+  };
+}
+
+function updateMapSource(featureCollection) {
+  const source = state.mapBrowser?.getSource("pois");
+  if (source?.setData) {
+    source.setData(featureCollection);
+  }
+}
+
+function renderMapStatus(payload) {
+  if (!payload) {
+    els.mapStatus.textContent = "";
+    return;
+  }
+  if (payload.truncated) {
+    els.mapStatus.textContent = `Showing ${payload.returned} of ${payload.total_matching} - apply filters or bbox to see more.`;
+    return;
+  }
+  els.mapStatus.textContent = `Showing ${payload.returned} of ${payload.total_matching}.`;
+}
+
+async function loadMapPoiDetail(poiId) {
+  els.mapDetailPanel.innerHTML = '<div class="empty-state">Loading POI detail...</div>';
+  try {
+    const detail = await requestJson(`/v1/admin/pois/${encodeURIComponent(poiId)}`, {
+      admin: true,
+    });
+    renderPoiDetail(detail, els.mapDetailPanel, { includeMap: false, compact: true });
+  } catch (error) {
+    els.mapDetailPanel.innerHTML = "";
+    els.mapDetailPanel.appendChild(emptyState(`Could not load POI detail: ${error.message}`));
+  }
 }
 
 async function loadQueryLogs() {
@@ -741,6 +1081,15 @@ function renderValue(value) {
 
 function buildExternalLinks(poi) {
   const links = [];
+  if (poi.external_links?.wikidata) {
+    links.push({ label: "Open in Wikidata", href: poi.external_links.wikidata });
+  }
+  if (poi.external_links?.osm) {
+    links.push({ label: "Open in OSM", href: poi.external_links.osm });
+  }
+  if (links.length) {
+    return links;
+  }
   const wikidataId = findWikidataId(poi);
   if (wikidataId) {
     links.push({ label: "Open in Wikidata", href: `https://www.wikidata.org/wiki/${wikidataId}` });

@@ -5,8 +5,12 @@ from typing import Literal, Protocol
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
     AdminMatchDiagnosticItem,
+    AdminPOIDetailResponse,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
+    AdminPOIListResponse,
+    AdminPOIMapFeatureCollection,
+    AdminPOIMapResponse,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
     AdminThemeSummaryItem,
@@ -44,6 +48,46 @@ class ScoringBackend(Protocol):
         status: str,
         city: str | None,
     ) -> list[AdminPOIItem]: ...
+
+    def get_admin_poi_list(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        limit: int,
+        offset: int,
+    ) -> AdminPOIListResponse: ...
+
+    def get_admin_poi_map(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        bbox: str | None,
+        limit: int,
+    ) -> AdminPOIMapResponse: ...
+
+    def get_admin_poi_detail(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIDetailResponse | None: ...
 
     def get_admin_poi_evidence(
         self,
@@ -125,6 +169,81 @@ class FixtureScoringBackend:
     ) -> AdminPOIEvidenceResponse | None:
         del db
         return engine.get_admin_poi_evidence(poi_id)
+
+    def get_admin_poi_list(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        limit: int,
+        offset: int,
+    ) -> AdminPOIListResponse:
+        del (
+            db,
+            search,
+            category,
+            review_state,
+            source,
+            themes,
+            theme_match,
+            has_diagnostics,
+            has_editorial_overrides,
+            active_only,
+        )
+        return AdminPOIListResponse(items=[], total=0, limit=limit, offset=offset)
+
+    def get_admin_poi_map(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        bbox: str | None,
+        limit: int,
+    ) -> AdminPOIMapResponse:
+        del (
+            db,
+            search,
+            category,
+            review_state,
+            source,
+            themes,
+            theme_match,
+            has_diagnostics,
+            has_editorial_overrides,
+            active_only,
+            bbox,
+        )
+        return AdminPOIMapResponse(
+            feature_collection=AdminPOIMapFeatureCollection(features=[]),
+            total_matching=0,
+            returned=0,
+            truncated=False,
+            limit=limit,
+        )
+
+    def get_admin_poi_detail(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIDetailResponse | None:
+        del db, poi_id
+        return None
 
     def get_admin_match_diagnostics(
         self,
@@ -261,6 +380,116 @@ class HybridScoringBackend(FixtureScoringBackend):
         if response is not None or not self.allow_fixture_fallback:
             return response
         return super().get_admin_poi_evidence(db, poi_id)
+
+    def get_admin_poi_list(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        limit: int,
+        offset: int,
+    ) -> AdminPOIListResponse:
+        try:
+            return query_service.get_admin_poi_list(
+                db,
+                search=search,
+                category=category,
+                review_state=review_state,
+                source=source,
+                themes=themes,
+                theme_match=theme_match,
+                has_diagnostics=has_diagnostics,
+                has_editorial_overrides=has_editorial_overrides,
+                active_only=active_only,
+                limit=limit,
+                offset=offset,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_poi_list(
+                db,
+                search=search,
+                category=category,
+                review_state=review_state,
+                source=source,
+                themes=themes,
+                theme_match=theme_match,
+                has_diagnostics=has_diagnostics,
+                has_editorial_overrides=has_editorial_overrides,
+                active_only=active_only,
+                limit=limit,
+                offset=offset,
+            )
+
+    def get_admin_poi_map(
+        self,
+        db: Session,
+        *,
+        search: str | None,
+        category: str | None,
+        review_state: str | None,
+        source: str | None,
+        themes: list[str],
+        theme_match: str,
+        has_diagnostics: bool | None,
+        has_editorial_overrides: bool | None,
+        active_only: bool,
+        bbox: str | None,
+        limit: int,
+    ) -> AdminPOIMapResponse:
+        try:
+            return query_service.get_admin_poi_map(
+                db,
+                search=search,
+                category=category,
+                review_state=review_state,
+                source=source,
+                themes=themes,
+                theme_match=theme_match,
+                has_diagnostics=has_diagnostics,
+                has_editorial_overrides=has_editorial_overrides,
+                active_only=active_only,
+                bbox=bbox,
+                limit=limit,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_poi_map(
+                db,
+                search=search,
+                category=category,
+                review_state=review_state,
+                source=source,
+                themes=themes,
+                theme_match=theme_match,
+                has_diagnostics=has_diagnostics,
+                has_editorial_overrides=has_editorial_overrides,
+                active_only=active_only,
+                bbox=bbox,
+                limit=limit,
+            )
+
+    def get_admin_poi_detail(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIDetailResponse | None:
+        try:
+            return query_service.get_admin_poi_detail(db, poi_id)
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_poi_detail(db, poi_id)
 
     def get_admin_match_diagnostics(
         self,

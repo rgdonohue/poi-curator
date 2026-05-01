@@ -1,5 +1,7 @@
 import logging
 from collections.abc import Sequence
+from dataclasses import dataclass
+from datetime import datetime
 from typing import cast as type_cast
 
 from geoalchemy2 import Geometry
@@ -21,9 +23,20 @@ from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
     AdminMatchDiagnosticItem,
     AdminPOIAliasItem,
+    AdminPOIDetailEvidenceItem,
+    AdminPOIDetailMatchDiagnosticItem,
+    AdminPOIDetailResponse,
+    AdminPOIEditorialOverrideItem,
     AdminPOIEvidenceItem,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
+    AdminPOIListItem,
+    AdminPOIListResponse,
+    AdminPOIMapFeature,
+    AdminPOIMapFeatureCollection,
+    AdminPOIMapFeatureGeometry,
+    AdminPOIMapFeatureProperties,
+    AdminPOIMapResponse,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
     AdminThemeSummaryItem,
@@ -53,7 +66,7 @@ from poi_curator_domain.themes import (
     is_query_theme_active,
 )
 from shapely.geometry import Point
-from sqlalchemy import cast, func, select
+from sqlalchemy import cast, func, or_, select
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy.sql.elements import ColumnElement
 
@@ -75,6 +88,12 @@ from poi_curator_scoring.place_representation import build_place_representation
 from poi_curator_scoring.shared_scoring import build_badges, build_why_it_matters
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AdminPOIBrowserRecord:
+    poi: POI
+    item: AdminPOIListItem
 
 
 def suggest_places(db: Session, payload: RouteSuggestRequest) -> RouteSuggestResponse:
@@ -381,6 +400,146 @@ def get_admin_queue(
     ]
 
 
+def get_admin_poi_list(
+    db: Session,
+    *,
+    search: str | None,
+    category: str | None,
+    review_state: str | None,
+    source: str | None,
+    themes: Sequence[str],
+    theme_match: str,
+    has_diagnostics: bool | None,
+    has_editorial_overrides: bool | None,
+    active_only: bool,
+    limit: int,
+    offset: int,
+) -> AdminPOIListResponse:
+    records = _load_admin_poi_browser_records(
+        db,
+        search=search,
+        category=category,
+        review_state=review_state,
+        source=source,
+        themes=themes,
+        theme_match=theme_match,
+        has_diagnostics=has_diagnostics,
+        has_editorial_overrides=has_editorial_overrides,
+        active_only=active_only,
+        bbox=None,
+    )
+    total = len(records)
+    page = records[offset : offset + limit]
+    return AdminPOIListResponse(
+        items=[record.item for record in page],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def get_admin_poi_map(
+    db: Session,
+    *,
+    search: str | None,
+    category: str | None,
+    review_state: str | None,
+    source: str | None,
+    themes: Sequence[str],
+    theme_match: str,
+    has_diagnostics: bool | None,
+    has_editorial_overrides: bool | None,
+    active_only: bool,
+    bbox: str | None,
+    limit: int,
+) -> AdminPOIMapResponse:
+    records = _load_admin_poi_browser_records(
+        db,
+        search=search,
+        category=category,
+        review_state=review_state,
+        source=source,
+        themes=themes,
+        theme_match=theme_match,
+        has_diagnostics=has_diagnostics,
+        has_editorial_overrides=has_editorial_overrides,
+        active_only=active_only,
+        bbox=_parse_bbox(bbox),
+    )
+    records = sorted(records, key=lambda record: record.item.poi_id)
+    total = len(records)
+    returned_records = records[:limit]
+    features = [
+        AdminPOIMapFeature(
+            geometry=AdminPOIMapFeatureGeometry(coordinates=record.item.coordinates or []),
+            properties=AdminPOIMapFeatureProperties(
+                poi_id=record.item.poi_id,
+                name=record.item.name,
+                primary_category=record.item.primary_category,
+                review_state=record.item.review_state,
+                source=record.item.source,
+                themes=record.item.themes,
+                has_diagnostics=record.item.has_diagnostics,
+                has_editorial_overrides=record.item.has_editorial_overrides,
+                is_active=record.item.is_active,
+                stale_since=record.item.stale_since,
+            ),
+        )
+        for record in returned_records
+        if record.item.coordinates is not None
+    ]
+    return AdminPOIMapResponse(
+        feature_collection=AdminPOIMapFeatureCollection(features=features),
+        total_matching=total,
+        returned=len(features),
+        truncated=total > limit,
+        limit=limit,
+    )
+
+
+def get_admin_poi_detail(
+    db: Session,
+    poi_id: str,
+) -> AdminPOIDetailResponse | None:
+    canonical = get_poi_detail(db, poi_id)
+    if canonical is None:
+        return None
+
+    poi = db.scalar(
+        select(POI)
+        .where(POI.poi_id == poi_id)
+        .options(
+            joinedload(POI.aliases),
+            joinedload(POI.editorial),
+            joinedload(POI.evidence_items).joinedload(POIEvidence.source),
+            joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
+            joinedload(POI.theme_editorials),
+        )
+    )
+    if poi is None:
+        return None
+
+    diagnostics = _load_match_diagnostics_by_poi_ids(db, [poi.poi_id]).get(poi.poi_id, [])
+    return AdminPOIDetailResponse(
+        poi_id=poi.poi_id,
+        canonical=canonical,
+        editorial_overrides=_build_editorial_overrides(poi),
+        aliases=_build_alias_items(poi),
+        evidence=_build_detail_evidence_items(poi),
+        themes=canonical.themes,
+        match_diagnostics=[
+            _build_poi_detail_match_diagnostic_item(diagnostic)
+            for diagnostic in sorted(
+                diagnostics,
+                key=lambda item: (item.updated_at, item.id),
+                reverse=True,
+            )
+        ],
+        external_links=_build_external_links(poi),
+        last_updated=poi.updated_at,
+    )
+
+
 def get_admin_poi_evidence(
     db: Session,
     poi_id: str,
@@ -627,6 +786,357 @@ def get_admin_match_diagnostics(
         query.order_by(OfficialMatchDiagnostic.updated_at.desc()).limit(limit)
     ).all()
     return [build_admin_match_diagnostic_item(item) for item in diagnostics]
+
+
+def _load_admin_poi_browser_records(
+    db: Session,
+    *,
+    search: str | None,
+    category: str | None,
+    review_state: str | None,
+    source: str | None,
+    themes: Sequence[str],
+    theme_match: str,
+    has_diagnostics: bool | None,
+    has_editorial_overrides: bool | None,
+    active_only: bool,
+    bbox: tuple[float, float, float, float] | None,
+) -> list[AdminPOIBrowserRecord]:
+    query = select(POI).options(
+        joinedload(POI.aliases),
+        joinedload(POI.editorial),
+        joinedload(POI.evidence_items).joinedload(POIEvidence.source),
+        joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
+        joinedload(POI.theme_editorials),
+    )
+    if active_only:
+        query = query.where(POI.is_active.is_(True))
+    if category is not None:
+        query = query.where(POI.normalized_category == category)
+
+    pois = db.execute(query.order_by(POI.updated_at.desc(), POI.poi_id)).unique().scalars().all()
+    diagnostics_by_poi_id = _load_match_diagnostics_by_poi_ids(
+        db,
+        [poi.poi_id for poi in pois],
+    )
+    normalized_search = search.casefold().strip() if search else None
+    normalized_source = source.casefold().strip() if source else None
+    requested_themes = [theme.strip() for theme in themes if theme.strip()]
+    records: list[AdminPOIBrowserRecord] = []
+
+    for poi in pois:
+        item_review_state = _status_for_poi(poi)
+        if review_state is not None and item_review_state != review_state:
+            continue
+        if normalized_search is not None and not _matches_search(poi, normalized_search):
+            continue
+        if normalized_source is not None and not _matches_source(poi, normalized_source):
+            continue
+
+        effective_themes = _theme_slugs_for_poi(poi)
+        if requested_themes and not _matches_theme_set(
+            effective_themes,
+            requested_themes,
+            theme_match,
+        ):
+            continue
+
+        has_diagnostic_rows = bool(diagnostics_by_poi_id.get(poi.poi_id))
+        if has_diagnostics is not None and has_diagnostic_rows != has_diagnostics:
+            continue
+
+        has_overrides = _has_editorial_overrides(poi)
+        if has_editorial_overrides is not None and has_overrides != has_editorial_overrides:
+            continue
+
+        coordinates = _coordinates_for_poi(poi)
+        if bbox is not None and not _coordinates_within_bbox(coordinates, bbox):
+            continue
+
+        records.append(
+            AdminPOIBrowserRecord(
+                poi=poi,
+                item=AdminPOIListItem(
+                    poi_id=poi.poi_id,
+                    name=poi.canonical_name,
+                    primary_category=poi.normalized_category,
+                    secondary_categories=[
+                        category
+                        for category in poi.display_categories
+                        if category != poi.normalized_category
+                    ],
+                    review_state=item_review_state,
+                    source=poi.primary_source,
+                    themes=effective_themes,
+                    last_updated=poi.updated_at,
+                    coordinates=coordinates,
+                    has_diagnostics=has_diagnostic_rows,
+                    has_editorial_overrides=has_overrides,
+                    is_active=poi.is_active,
+                    stale_since=_stale_since_for_poi(poi, item_review_state),
+                ),
+            )
+        )
+
+    return records
+
+
+def _load_match_diagnostics_by_poi_ids(
+    db: Session,
+    poi_ids: Sequence[str],
+) -> dict[str, list[OfficialMatchDiagnostic]]:
+    if not poi_ids:
+        return {}
+    diagnostics = db.scalars(
+        select(OfficialMatchDiagnostic)
+        .where(
+            or_(
+                OfficialMatchDiagnostic.matched_poi_id.in_(poi_ids),
+                OfficialMatchDiagnostic.resolved_poi_id.in_(poi_ids),
+            )
+        )
+        .options(
+            joinedload(OfficialMatchDiagnostic.source),
+            joinedload(OfficialMatchDiagnostic.poi),
+            joinedload(OfficialMatchDiagnostic.resolved_poi),
+        )
+        .order_by(OfficialMatchDiagnostic.updated_at.desc(), OfficialMatchDiagnostic.id)
+    ).all()
+    by_poi_id: dict[str, list[OfficialMatchDiagnostic]] = {poi_id: [] for poi_id in poi_ids}
+    for diagnostic in diagnostics:
+        if diagnostic.matched_poi_id in by_poi_id:
+            by_poi_id[diagnostic.matched_poi_id].append(diagnostic)
+        if (
+            diagnostic.resolved_poi_id in by_poi_id
+            and diagnostic.resolved_poi_id != diagnostic.matched_poi_id
+        ):
+            by_poi_id[diagnostic.resolved_poi_id].append(diagnostic)
+    return by_poi_id
+
+
+def _matches_search(poi: POI, normalized_search: str) -> bool:
+    if normalized_search in poi.canonical_name.casefold():
+        return True
+    return any(
+        normalized_search in alias.alias_name.casefold()
+        or normalized_search in alias.normalized_alias.casefold()
+        for alias in getattr(poi, "aliases", []) or []
+    )
+
+
+def _matches_source(poi: POI, normalized_source: str) -> bool:
+    if normalized_source in poi.primary_source.casefold():
+        return True
+    for item in getattr(poi, "evidence_items", []) or []:
+        source_values = [
+            item.source_id,
+            item.source.source_name if item.source is not None else None,
+            item.source.source_type if item.source is not None else None,
+        ]
+        if any(
+            value is not None and normalized_source in value.casefold()
+            for value in source_values
+        ):
+            return True
+    return False
+
+
+def _theme_slugs_for_poi(poi: POI) -> list[str]:
+    resolved = resolve_effective_theme_memberships(poi)
+    return [
+        str(theme_slug)
+        for theme_slug, membership in sorted(resolved.items())
+        if membership.status != "suppressed"
+    ]
+
+
+def _matches_theme_set(
+    effective_themes: Sequence[str],
+    requested_themes: Sequence[str],
+    theme_match: str,
+) -> bool:
+    effective = set(effective_themes)
+    requested = set(requested_themes)
+    if theme_match == "all":
+        return requested.issubset(effective)
+    return bool(effective.intersection(requested))
+
+
+def _coordinates_for_poi(poi: POI) -> list[float] | None:
+    if poi.centroid is None:
+        return None
+    point = to_shape(poi.centroid)
+    return [point.x, point.y]
+
+
+def _coordinates_within_bbox(
+    coordinates: list[float] | None,
+    bbox: tuple[float, float, float, float],
+) -> bool:
+    if coordinates is None:
+        return False
+    min_lon, min_lat, max_lon, max_lat = bbox
+    lon, lat = coordinates
+    return min_lon <= lon <= max_lon and min_lat <= lat <= max_lat
+
+
+def _parse_bbox(value: str | None) -> tuple[float, float, float, float] | None:
+    if value is None or not value.strip():
+        return None
+    parts = value.split(",")
+    if len(parts) != 4:
+        raise ValueError("bbox must be min_lon,min_lat,max_lon,max_lat")
+    try:
+        min_lon, min_lat, max_lon, max_lat = [float(part.strip()) for part in parts]
+    except ValueError as exc:
+        raise ValueError("bbox must contain numeric coordinates") from exc
+    if min_lon > max_lon or min_lat > max_lat:
+        raise ValueError("bbox minimum coordinates must be less than maximum coordinates")
+    return (min_lon, min_lat, max_lon, max_lat)
+
+
+def _has_editorial_overrides(poi: POI) -> bool:
+    editorial = poi.editorial
+    return editorial is not None and any(
+        (
+            editorial.editorial_title_override is not None,
+            editorial.editorial_description_override is not None,
+            editorial.editorial_category_override is not None,
+            editorial.editorial_boost != 0,
+        )
+    )
+
+
+def _stale_since_for_poi(poi: POI, review_state: str) -> datetime | None:
+    if not poi.is_active and review_state == "stale":
+        return poi.updated_at
+    return None
+
+
+def _build_editorial_overrides(poi: POI) -> dict[str, AdminPOIEditorialOverrideItem]:
+    editorial = poi.editorial
+    if editorial is None:
+        return {}
+    updated_at = editorial.last_reviewed_at
+    updated_by = editorial.reviewed_by
+    overrides: dict[str, AdminPOIEditorialOverrideItem] = {}
+    if editorial.editorial_title_override is not None:
+        overrides["name"] = AdminPOIEditorialOverrideItem(
+            value=editorial.editorial_title_override,
+            source_value=poi.canonical_name,
+            updated_at=updated_at,
+            updated_by=updated_by,
+        )
+    if editorial.editorial_description_override is not None:
+        overrides["short_description"] = AdminPOIEditorialOverrideItem(
+            value=editorial.editorial_description_override,
+            source_value=poi.short_description,
+            updated_at=updated_at,
+            updated_by=updated_by,
+        )
+    if editorial.editorial_category_override is not None:
+        overrides["primary_category"] = AdminPOIEditorialOverrideItem(
+            value=editorial.editorial_category_override,
+            source_value=poi.normalized_category,
+            updated_at=updated_at,
+            updated_by=updated_by,
+        )
+    if editorial.editorial_boost != 0:
+        overrides["editorial_boost"] = AdminPOIEditorialOverrideItem(
+            value=editorial.editorial_boost,
+            source_value=0,
+            updated_at=updated_at,
+            updated_by=updated_by,
+        )
+    return overrides
+
+
+def _build_alias_items(poi: POI) -> list[AdminPOIAliasItem]:
+    return [
+        AdminPOIAliasItem(
+            alias_name=alias.alias_name,
+            normalized_alias=alias.normalized_alias,
+            alias_type=alias.alias_type,
+            source=alias.source,
+            confidence=alias.confidence,
+            is_preferred=alias.is_preferred,
+            notes=alias.notes,
+            created_at=alias.created_at,
+        )
+        for alias in sorted(
+            getattr(poi, "aliases", []) or [],
+            key=lambda alias: (not alias.is_preferred, alias.alias_name.casefold()),
+        )
+    ]
+
+
+def _build_detail_evidence_items(poi: POI) -> list[AdminPOIDetailEvidenceItem]:
+    return [
+        AdminPOIDetailEvidenceItem(
+            evidence_id=item.id,
+            source_id=item.source_id,
+            source_name=item.source.source_name if item.source is not None else None,
+            source_type=item.source.source_type if item.source is not None else None,
+            trust_class=item.source.trust_class if item.source is not None else None,
+            evidence_type=item.evidence_type,
+            label=item.evidence_label,
+            text=item.evidence_text,
+            url=item.evidence_url,
+            external_record_id=item.external_record_id,
+            confidence=item.confidence,
+            match_method=match_method_for_evidence(item),
+            observed_at=item.observed_at,
+            raw_payload=item.raw_evidence_json,
+        )
+        for item in sorted(
+            getattr(poi, "evidence_items", []) or [],
+            key=lambda item: (item.observed_at, item.source_id, item.evidence_type),
+            reverse=True,
+        )
+    ]
+
+
+def _build_poi_detail_match_diagnostic_item(
+    item: OfficialMatchDiagnostic,
+) -> AdminPOIDetailMatchDiagnosticItem:
+    base = build_admin_match_diagnostic_item(item)
+    raw_payload = item.raw_payload_json or {}
+    reviewer_notes = raw_payload.get("reviewer_notes")
+    return AdminPOIDetailMatchDiagnosticItem(
+        id=base.id,
+        source_id=base.source_id,
+        source_name=base.source_name,
+        source_type=base.source_type,
+        external_record_id=base.external_record_id,
+        external_name=base.external_name,
+        best_candidate_poi_id=base.best_candidate_poi_id,
+        best_candidate_name=base.best_candidate_name,
+        resolved_poi_id=base.resolved_poi_id,
+        resolved_poi_name=base.resolved_poi_name,
+        best_similarity=base.best_similarity,
+        match_strategy=base.match_strategy,
+        resolution_method=base.resolution_method,
+        why_not_auto_linked=base.why_not_auto_linked,
+        state=base.status,
+        reviewer_notes=reviewer_notes if isinstance(reviewer_notes, str) else None,
+        reviewed_at=base.reviewed_at,
+        reviewed_by=base.reviewed_by,
+        created_at=base.created_at,
+        updated_at=base.updated_at,
+    )
+
+
+def _build_external_links(poi: POI) -> dict[str, str]:
+    links: dict[str, str] = {}
+    if poi.osm_id:
+        osm_id = poi.osm_id.strip("/")
+        if "/" in osm_id:
+            links["osm"] = f"https://www.openstreetmap.org/{osm_id}"
+        else:
+            links["osm"] = f"https://www.openstreetmap.org/node/{osm_id}"
+    if poi.wikidata_id:
+        links["wikidata"] = f"https://www.wikidata.org/wiki/{poi.wikidata_id}"
+    return links
 
 
 def _status_for_poi(poi: POI) -> str:

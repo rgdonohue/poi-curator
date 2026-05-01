@@ -24,13 +24,14 @@ the UI clears the input and does not display the key. Use **Clear key** to remov
 
 ## Views
 
-- **POI List**: Shows the intended table and filter controls for a paginated POI inventory. The
-  required list endpoint is not exposed yet, so this pass renders an explicit endpoint-needed state.
-- **POI Detail**: Loads a known POI id through `GET /v1/poi/{poi_id}`. It shows canonical public
-  fields, exposed evidence grouped by source, exposed theme memberships, external OSM/Wikidata
-  links when discoverable, and a small MapLibre location map.
-- **Map Browser**: Provides the full-screen MapLibre shell and filter sidebar. Clustered active POI
-  markers require a collection endpoint that is not exposed yet.
+- **POI List**: Uses `GET /v1/admin/pois` for a paginated POI inventory with category,
+  review-state, source, theme, diagnostics, editorial-override, active-only, and free-text filters.
+- **POI Detail**: Loads a known POI id through `GET /v1/admin/pois/{poi_id}`. It shows canonical
+  fields, editorial override badges, aliases, evidence grouped by source with raw payloads, theme
+  memberships, match diagnostics, external OSM/Wikidata links, and a small MapLibre location map.
+- **Map Browser**: Uses `GET /v1/admin/pois/map` for clustered active POI markers with the same
+  filters as the POI List. If the endpoint returns `truncated=true`, the sidebar shows the returned
+  and total counts so curators know to apply tighter filters.
 - **Query Logs**: Uses `GET /v1/admin/query-logs` with the saved admin key. Supports endpoint, date
   range, and result-count filters. Expanding a row shows `request_payload` and the result array, with
   result POI ids linked to the POI Detail view.
@@ -43,8 +44,7 @@ the UI clears the input and does not display the key. Use **Clear key** to remov
   ingest actions.
 - No bulk actions.
 - No authentication beyond the existing admin key header.
-- POI list pagination/filtering, all-POI map browsing, aliases, diagnostics, reviewer notes, and
-  editorial override indicators need additional read-only admin API support. See
-  `apps/admin/NEEDED_ENDPOINTS.md`.
+- The map browser requests up to 2000 features. Use filters to reduce the result set when the UI
+  reports truncation.
 - Frontend tests are intentionally out of scope for this pass; use a manual smoke test through the
   running FastAPI app.

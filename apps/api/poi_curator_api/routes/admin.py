@@ -10,8 +10,11 @@ from poi_curator_domain.schemas import (
     AdminIngestRunResponse,
     AdminIngestStatusResponse,
     AdminMatchDiagnosticItem,
+    AdminPOIDetailResponse,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
+    AdminPOIListResponse,
+    AdminPOIMapResponse,
     AdminPOIPatchRequest,
     AdminPOIPatchResponse,
     AdminResolveDiagnosticRequest,
@@ -29,6 +32,7 @@ from poi_curator_editorial import service as editorial_service
 from poi_curator_api.dependencies import DatabaseSession, ScoringBackendDep
 
 OPTIONAL_DATETIME_QUERY = Query(default=None)
+ThemeMatchQuery = Query(default="any", pattern="^(any|all)$")
 
 
 def require_admin_api_key(
@@ -54,6 +58,102 @@ def admin_poi_queue(
     city: str | None = Query(default=None),
 ) -> list[AdminPOIItem]:
     return backend.get_admin_queue(db, status=status, city=city)
+
+
+@router.get("/pois", response_model=AdminPOIListResponse)
+def admin_pois(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    search: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    review_state: str | None = Query(default=None),
+    source: str | None = Query(default=None),
+    theme: str | None = Query(
+        default=None,
+        description="Comma-separated theme slugs. Use theme_match=any or all for set semantics.",
+    ),
+    theme_match: str = ThemeMatchQuery,
+    has_diagnostics: bool | None = Query(default=None),
+    has_editorial_overrides: bool | None = Query(default=None),
+    active_only: bool = Query(
+        default=True,
+        description="When false, inactive/stale POIs are included for curator audit.",
+    ),
+    limit: int = Query(default=50, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> AdminPOIListResponse:
+    return backend.get_admin_poi_list(
+        db,
+        search=search,
+        category=category,
+        review_state=review_state,
+        source=source,
+        themes=parse_theme_list(theme),
+        theme_match=theme_match,
+        has_diagnostics=has_diagnostics,
+        has_editorial_overrides=has_editorial_overrides,
+        active_only=active_only,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/pois/map", response_model=AdminPOIMapResponse)
+def admin_pois_map(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    search: str | None = Query(default=None),
+    category: str | None = Query(default=None),
+    review_state: str | None = Query(default=None),
+    source: str | None = Query(default=None),
+    theme: str | None = Query(
+        default=None,
+        description="Comma-separated theme slugs. Use theme_match=any or all for set semantics.",
+    ),
+    theme_match: str = ThemeMatchQuery,
+    has_diagnostics: bool | None = Query(default=None),
+    has_editorial_overrides: bool | None = Query(default=None),
+    active_only: bool = Query(default=True),
+    bbox: str | None = Query(
+        default=None,
+        description="Optional min_lon,min_lat,max_lon,max_lat filter.",
+    ),
+    limit: int = Query(default=2000, ge=1, le=5000),
+) -> AdminPOIMapResponse:
+    """Return filtered POI map features with deterministic capped truncation.
+
+    Callers should supply bbox or filters to stay under the cap. If total matching rows exceed
+    limit, results are sorted by poi_id before slicing and truncated=true is returned.
+    """
+    try:
+        return backend.get_admin_poi_map(
+            db,
+            search=search,
+            category=category,
+            review_state=review_state,
+            source=source,
+            themes=parse_theme_list(theme),
+            theme_match=theme_match,
+            has_diagnostics=has_diagnostics,
+            has_editorial_overrides=has_editorial_overrides,
+            active_only=active_only,
+            bbox=bbox,
+            limit=limit,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@router.get("/pois/{poi_id}", response_model=AdminPOIDetailResponse)
+def admin_poi_detail(
+    poi_id: str,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> AdminPOIDetailResponse:
+    response = backend.get_admin_poi_detail(db, poi_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="POI not found")
+    return response
 
 
 @router.patch("/poi/{poi_id}", response_model=AdminPOIPatchResponse)
@@ -281,3 +381,9 @@ def ingest_status() -> AdminIngestStatusResponse:
         status="idle",
         last_successful_run_at=None,
     )
+
+
+def parse_theme_list(value: str | None) -> list[str]:
+    if value is None:
+        return []
+    return [item.strip() for item in value.split(",") if item.strip()]
