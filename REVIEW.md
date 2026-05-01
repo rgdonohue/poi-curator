@@ -164,3 +164,69 @@ Verification:
 - `.venv/bin/python -m pytest` - 124 passed, 19 skipped because local Postgres is unavailable.
 - `.venv/bin/python scripts/run_check_suite.py --suite core-product` - failed because PostGIS is
   not running on `localhost:5432` (connection refused).
+
+## Post-Remediation Verification — 2026-04-30T17:44:52Z
+
+Setup:
+- `make db-up` started `poi-curator-db` after Docker Desktop was launched.
+- `make migrate` applied Alembic migrations successfully.
+- `psql postgresql://poi_curator:poi_curator@localhost:5432/poi_curator -c "select 1 as reachable"`
+  confirmed DB reachability.
+
+Pytest summary:
+- `.venv/bin/python -m pytest -v` - 143 passed, 0 failed, 0 skipped.
+- Previously skipped DB-backed tests ran and passed, including
+  `test_osm_reset_clears_dependent_rows_without_orphans`,
+  `test_deactivate_stale_osm_pois_marks_missing_current_batch_inactive`, and the 9 DB-backed
+  admin editorial tests in `tests/unit/test_admin_editorial.py`.
+- Failures: none.
+
+Check suite summary:
+- `python3 scripts/run_check_suite.py ...` failed because system `python3` does not have the
+  editable package environment (`ModuleNotFoundError: poi_curator_domain`).
+- Equivalent repo-runtime command used:
+  `.venv/bin/python scripts/run_check_suite.py --suite core-product --suite all-fixtures --suite empty-result-guardrails --suite rail-smoke --split-cases`.
+- Output directory: `reports/check_runs/20260430T174322Z/`.
+- `core-product`: 6 passed, 0 failed.
+- `all-fixtures`: 14 passed, 0 failed.
+- `empty-result-guardrails`: 4 passed, 0 failed.
+- `rail-smoke`: 4 passed, 0 failed.
+- Total suite runs: 28 passed, 0 failed.
+
+Baseline diff:
+- Prior baseline: `reports/check_runs/20260408T_history_validation_final/index.md`.
+- New run: `reports/check_runs/20260430T174322Z/index.md`.
+- Total suite-run count delta: 28 new vs 20 baseline, delta +8.
+- Unique case id delta: 14 new vs 14 baseline, delta 0.
+- Regressions: none. No baseline-passing shared suite run failed in the new run.
+- Improvements: none. The baseline had no failing shared suite runs.
+- New suite runs: `empty-result-guardrails` (`nearby-plaza-water-empty`,
+  `nearby-plaza-rail-empty`, `nearby-downtown-scenic-empty`,
+  `route-downtown-scenic-empty`) and `rail-smoke` (`nearby-railyard-civic`,
+  `nearby-railyard-rail`, `route-railyard-civic`, `route-railyard-rail`).
+- Score/order drift notes:
+  - `nearby-plaza-history`: The Santa Fe Plaza moved from rank 3 score 71.3 to rank 2 score
+    73.3. Drift came from point proximity/radius-fit components (`distance_from_center_m=100`
+    baseline vs 48 new) while all expectations still passed.
+  - `route-historic-center-driving`: `Kruger Building` and `Gregorio Crespín House` both score
+    78.4; order is now stable as `Kruger Building` before `Gregorio Crespín House`, consistent
+    with the Phase 4 deterministic tie-breaker.
+
+Determinism check:
+- Ran `core-product` twice against the same DB state:
+  `reports/check_runs/20260430T174415Z/` and `reports/check_runs/20260430T174418Z/`.
+- Pass/fail outcomes: identical, 6 passed and 0 failed in both runs.
+- Per-case score values: identical.
+- Result POI ordering: identical.
+- Determinism result: pass.
+
+Baseline promotion decision:
+- Promoted `reports/check_runs/20260430T174322Z/` to
+  `reports/check_runs/20260430T_post_remediation_baseline/`.
+- Updated `README.md` to point to
+  `reports/check_runs/20260430T_post_remediation_baseline/index.md`.
+
+Regression fixes applied during this pass:
+- None.
+
+Remediation 3b3a20a verified end-to-end against PostGIS.

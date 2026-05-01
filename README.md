@@ -126,10 +126,11 @@ It writes timestamped grouped outputs under `reports/check_runs/<timestamp>/`:
 The latest saved full Santa Fe validation report in this repo is:
 
 ```text
-reports/check_runs/20260408T_history_validation_final/index.md
+reports/check_runs/20260430T_post_remediation_baseline/index.md
 ```
 
-It records 20 passing case runs across `core-product` and `all-fixtures`.
+It records 28 passing case runs across `core-product`, `all-fixtures`,
+`empty-result-guardrails`, and `rail-smoke`.
 
 ## Repository Layout
 
