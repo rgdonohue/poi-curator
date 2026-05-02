@@ -19,6 +19,12 @@ Canonical names are display labels for Detour. They should be readable to a trav
 5. Use the more specific common civic/infrastructure name when it disambiguates.
    For bridges and similar civic assets, keep the street-specific common name when it improves recognition, for example `Don Gaspar Avenue Bridge`; preserve the shorter register name as an alternate.
 
+6. GNIS variants are alternates, not automatic display replacements.
+   GNIS variant names should be preserved as sourced alternate names for search, provenance, and conflict review. The current GNIS official name can be canonical for GNIS-created POIs, but a reviewed local/common name from OSM, city records, or editorial review should remain canonical when it is clearer for display.
+
+7. OSE acequia and POD labels are provisional source labels.
+   Public OSE labels for points of diversion and conveyances should be preserved as source evidence. All-caps names, shorthand labels, and `Point of Diversion - X` names are acceptable for unreviewed canonicals, but reviewed display names should normalize capitalization and avoid adding unpublished steward/local names without explicit permission.
+
 ## Admin Display
 
 The admin viewer should show the canonical value as the highlighted value for each field and list all alternate sourced values below it. Name conflicts caused only by register order, accents, articles, or parenthetical normalization are still conflicts, but they should be treated as resolved normalization cases once exactly one provenance row is marked canonical.

@@ -23,3 +23,20 @@ OpenPOIs is solving the OSM-Overture conflation problem at national scale with q
 
 - Do not refactor current OSM ingestion to consume OpenPOIs. Working ingestion exists; switching mid-stream is a multi-week refactor with uncertain payoff for the Santa Fe deployment.
 - Do not add OpenPOIs as a Tier A source in the source ecology doc. It is not a corroboration source; it is a candidate replacement for the spatial spine itself, which is a different kind of decision.
+
+---
+
+## 2026-05-02 — GNIS and NMOSE sprint broadens official-name and water-system coverage
+
+The GNIS and NMOSE acequia/POD sprint added 128 source-primary canonical POIs in the live Santa Fe database: 117 `gnis` canonicals and 11 `nmose_pod` canonicals, bringing active canonicals to 686. GNIS contributed 120 official-name evidence rows and 108 variant-name rows, while NMOSE contributed 66 water-system evidence rows across POD, acequia membership, and acequia association evidence. The strongest coverage improvement is official geographic-name coverage and water/acequia context rather than immediately polished traveler-facing stops.
+
+### Why this matters for POI Curator
+
+This sprint confirms that official-name and infrastructure agencies are useful source layers, but they are not interchangeable with editorially curated POIs. GNIS broadens the spatial/name corpus and exposes variant names; NMOSE makes water-system relationships visible while reinforcing the need for permission-aware acequia handling. The product value comes when these source facts are reviewed, contextualized, and connected to route-plausible interpretation.
+
+### Implications if revisited
+
+- For source posture: official geographic-name sources are good candidate generators and provenance layers, but broad civil/populated-place records should remain review-heavy before Detour surfacing.
+- For water-theme coverage: NMOSE evidence strengthens the acequia/water layer without requiring private steward records; future enrichment should preserve the public/private boundary explicitly.
+- For conflict policy: GNIS variant names are expected conflicts and should be treated as alternates unless editorial review promotes one to canonical display.
+- For operations: parallel source sprints work, but shared live database writes make before/after counts harder to interpret; future sub-agent sprints should isolate operational DB runs or coordinate write windows.

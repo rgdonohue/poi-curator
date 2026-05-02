@@ -85,7 +85,14 @@ def upgrade() -> None:
         """
         INSERT INTO poi_field_provenance
             (poi_id, field_name, source_id, value, confidence, observed_at, is_canonical)
-        SELECT poi_id, 'primary_category', 'osm', to_jsonb(normalized_category), 0.75, updated_at, true
+        SELECT
+            poi_id,
+            'primary_category',
+            'osm',
+            to_jsonb(normalized_category),
+            0.75,
+            updated_at,
+            true
         FROM poi
         WHERE primary_source = 'osm_overpass'
         """
@@ -110,7 +117,14 @@ def upgrade() -> None:
         """
         INSERT INTO poi_field_provenance
             (poi_id, field_name, source_id, value, confidence, observed_at, is_canonical)
-        SELECT poi_id, 'short_description', 'osm', to_jsonb(short_description), 0.60, updated_at, true
+        SELECT
+            poi_id,
+            'short_description',
+            'osm',
+            to_jsonb(short_description),
+            0.60,
+            updated_at,
+            true
         FROM poi
         WHERE primary_source = 'osm_overpass' AND short_description IS NOT NULL
         """
@@ -128,7 +142,14 @@ def upgrade() -> None:
         """
         INSERT INTO poi_field_provenance
             (poi_id, field_name, source_id, value, confidence, observed_at, is_canonical)
-        SELECT poi_id, 'wikipedia_title', 'wikidata', to_jsonb(wikipedia_title), 0.85, updated_at, true
+        SELECT
+            poi_id,
+            'wikipedia_title',
+            'wikidata',
+            to_jsonb(wikipedia_title),
+            0.85,
+            updated_at,
+            true
         FROM poi
         WHERE wikipedia_title IS NOT NULL
         """

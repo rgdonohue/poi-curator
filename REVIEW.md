@@ -270,3 +270,48 @@ Regression fixes applied during this pass:
 - None.
 
 Remediation 3b3a20a verified end-to-end against PostGIS.
+
+## GNIS/NMOSE Source Sprint Verification — 2026-05-02
+
+Changes merged:
+- `sprint/gnis` (`ef0687d`): added GNIS pipe-delimited text ingestion, source documentation,
+  unit coverage, and `reports/curation_outcomes/20260502_gnis_run.md`.
+- `sprint/nmose-acequia` (`c53c4ba` merge): added public NMOSE POD and acequia conveyance
+  ingestion, source documentation, unit coverage, and
+  `reports/curation_outcomes/20260502_nmose_acequia_run.md`.
+- `docs/EDITORIAL_NAMING_POLICY.md`: added rules for GNIS variant names and public OSE
+  acequia/POD labels.
+- `reports/curation_outcomes/20260502_post_sprint_followups.md`: records duplicate-review,
+  diagnostics, policy, and verification follow-ups.
+
+Database curation outcomes:
+- Active canonical POIs after both runs: 686.
+- Source-primary additions from this sprint: 117 `gnis` canonicals and 11 `nmose_pod`
+  canonicals.
+- Evidence added by the runs: 120 GNIS official-name rows, 108 GNIS variant-name rows,
+  11 NMOSE POD rows, 24 NMOSE acequia-membership rows, and 31 NMOSE acequia-association rows.
+- No new duplicate-review cases or ambiguous diagnostics were surfaced for `gnis`, `nmose_pod`,
+  or `nmose_acequia`.
+- Field conflicts now total 92 rows: 44 name, 21 coordinates, 21 short description, and
+  6 primary category. New name conflicts are mostly GNIS variant-name alternates.
+
+Verification:
+- `.venv/bin/python -m pytest` - 174 passed.
+- `.venv/bin/ruff check .` - passed after a formatting-only line wrap in
+  `migrations/versions/20260501_0011_multi_source_provenance.py`.
+- `.venv/bin/mypy apps packages tests` - passed with no issues in 89 source files.
+- `.venv/bin/python scripts/run_check_suite.py --suite core-product` - 6 passed, 0 failed.
+  Output directory: `reports/check_runs/20260502T144735Z/`.
+- Full saved check-suite run:
+  `.venv/bin/python scripts/run_check_suite.py --suite core-product --suite all-fixtures --suite empty-result-guardrails --suite rail-smoke --split-cases`
+  - 28 passed, 0 failed. Output directory: `reports/check_runs/20260502T144858Z/`.
+
+Score drift and baseline decision:
+- The full suite still passes all 28 saved case runs after 128 source-primary additions.
+- Core expected anchors and ordering remained stable for the product-critical cases; new GNIS and
+  NMOSE records did not displace existing expected results.
+- Water-theme evidence improved materially at the corpus level through NMOSE acequia/POD evidence,
+  but the current scoring fixtures still return the existing Acequia Madre anchor rather than new
+  POD canonicals, which is appropriate until those records receive editorial review.
+- Promoted the post-sprint full run to
+  `reports/check_runs/20260502T_gnis_nmose_baseline/` and updated `README.md` to point to it.

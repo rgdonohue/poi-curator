@@ -136,6 +136,15 @@ reports/check_runs/20260430T_post_remediation_baseline/index.md
 It records 28 passing case runs across `core-product`, `all-fixtures`,
 `empty-result-guardrails`, and `rail-smoke`.
 
+The latest saved full Santa Fe validation report after the GNIS/NMOSE source sprint is:
+
+```text
+reports/check_runs/20260502T_gnis_nmose_baseline/index.md
+```
+
+It also records 28 passing case runs across the same suite set, with source-corpus drift
+documented in `REVIEW.md`.
+
 ## Repository Layout
 
 ```text
