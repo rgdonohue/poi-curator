@@ -61,6 +61,39 @@ separate from canonical POIs; canonical fields carry per-field provenance.
 - Match strategy: polygon containment/intersection against canonical POI centroids. District
   polygons do not become canonical POIs in this phase.
 
+## USGS Geographic Names Information System
+
+- Source id: `gnis`
+- Download/documentation URL:
+  `https://www.usgs.gov/us-board-on-geographic-names/download-gnis-data`
+- Current state text URL:
+  `https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/DomesticNames/DomesticNames_NM_Text.zip`
+- Variant-name URL:
+  `https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/Topical/AllNames_National_Text.zip`
+- Historical-feature URL:
+  `https://prd-tnm.s3.amazonaws.com/StagedProducts/GeographicNames/Topical/HistoricalFeatures_National_Text.zip`
+- Chosen format: USGS pipe-delimited text files inside `.zip` downloads. The New Mexico domestic
+  names file provides official names and coordinates; the national All Names topical file provides
+  official and variant names keyed by `feature_id`; the national Historical Features topical file
+  marks records whose GNIS historical designation means the name is no longer in use or the feature
+  no longer serves its original purpose.
+- Acquisition date: 2026-05-02
+- License/access notes: USGS GNIS downloads are public domain.
+- Refresh cadence: manual local ingest for now; USGS states that GNIS data products are refreshed
+  every other month.
+- Current scope: New Mexico rows filtered to Santa Fe County for canonical creation. Other New
+  Mexico counties are retained only when they attach as evidence to an existing cross-county
+  canonical POI.
+- Relevance filter: canonical candidates are limited to `Canal`, `Civil`, `Crossing`, `Military`,
+  and `Populated Place`. This intentionally excludes broad natural-feature classes, generic
+  reservoir/tank records, and non-POI utility records such as bench marks or coordinate locators
+  where they appear in legacy products.
+- Canonical fields contributed: `name`, `primary_category`, `coordinates`, `short_description`
+- Evidence contributed: `geographic_name`, `variant_name`, and `historical_feature`
+- Match strategy: existing shared matcher only; Wikidata identifier first when available, then a
+  100 m spatial window plus normalized name similarity at threshold 0.85. Historical GNIS records
+  can attach as evidence to an existing canonical, but do not create new canonical POIs.
+
 ## Wikidata
 
 - Source id: `wikidata`

@@ -14,6 +14,7 @@ from poi_curator_ingestion.pipeline import (
     refresh_osm_region_from_current_raw,
     reset_osm_region,
 )
+from poi_curator_ingestion.sources.gnis import ingest_gnis_records
 from poi_curator_ingestion.sources.nrhp import ingest_nrhp_records
 from poi_curator_ingestion.sources.sf_arcgis import ingest_historic_district_memberships
 
@@ -200,6 +201,30 @@ def ingest_nrhp(region: str = typer.Option(..., help="Region slug to ingest.")) 
                 f"ambiguous={summary.ambiguous_count}",
                 f"skipped_without_coordinates={summary.skipped_without_coordinates}",
                 f"stale_deactivated={summary.stale_deactivated}",
+            ]
+        )
+    )
+
+
+@app.command("gnis")
+def ingest_gnis(region: str = typer.Option(..., help="Region slug to ingest.")) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        summary = ingest_gnis_records(session, region)
+    typer.echo(
+        "\n".join(
+            [
+                f"region={summary.region}",
+                f"candidate_records={summary.candidate_record_count}",
+                f"canonical_created={summary.canonical_created}",
+                f"evidence_attached={summary.evidence_attached}",
+                f"variant_evidence_attached={summary.variant_evidence_attached}",
+                f"historical_evidence_attached={summary.historical_evidence_attached}",
+                f"ambiguous={summary.ambiguous_count}",
+                f"skipped_without_coordinates={summary.skipped_without_coordinates}",
+                f"skipped_out_of_scope={summary.skipped_out_of_scope}",
+                f"skipped_feature_class={summary.skipped_feature_class}",
+                f"historical_without_match={summary.historical_without_match}",
             ]
         )
     )
