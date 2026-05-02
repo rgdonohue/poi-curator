@@ -61,6 +61,36 @@ separate from canonical POIs; canonical fields carry per-field provenance.
 - Match strategy: polygon containment/intersection against canonical POI centroids. District
   polygons do not become canonical POIs in this phase.
 
+## New Mexico OSE Points of Diversion and Acequia Conveyances
+
+- Source ids: `nmose_pod`, `nmose_acequia`
+- Catalog URL:
+  `https://catalog.newmexicowaterdata.org/application/new-mexico-points-of-diversion-and-water-rights-regulatory-map`
+- POD ArcGIS REST layer:
+  `https://services2.arcgis.com/qXZbWTdPDbTjl7Dy/arcgis/rest/services/OSE_Points_of_Diversion/FeatureServer/0`
+- Conveyance ArcGIS REST layer:
+  `https://services2.arcgis.com/qXZbWTdPDbTjl7Dy/arcgis/rest/services/OSE_Conveyances/FeatureServer/0`
+- Chosen format: ArcGIS REST GeoJSON queries.
+- License/access notes: public NM OSE ArcGIS REST data. OSE publishes the geographic data and
+  metadata as-is without warranty; verify downstream redistribution before publishing raw rows.
+- Refresh cadence: manual local ingest for now. The catalog describes PODs as monthly-updated.
+- Current scope: Santa Fe County. POD canonical creation is intentionally limited to active Santa
+  Fe County POD records tied to meaningful named conveyances, because the full county POD layer is
+  mostly water-rights/well infrastructure and would produce noisy canonical POIs. Acequia evidence
+  uses active, named, acequia-like conveyance geometries (`ACQ`, `ACQT`, `CMD`, `CAN`, `DIT`) that
+  intersect a Santa Fe County envelope.
+- Canonical fields contributed: `name`, `primary_category`, `coordinates`, `short_description` for
+  POD-created canonical POIs.
+- Evidence contributed: `point_of_diversion`, `acequia_membership`, `acequia_association`.
+- Match strategy: POD points use the shared multi-source matcher, with Wikidata identifier support
+  if present and the current 100 m spatial/name fallback. Acequia conveyance lines do not become
+  canonical POIs; they attach membership evidence to existing canonical POIs within a 50 m buffer.
+- Data-sovereignty caveat: Source New Mexico reported on 2023-06-08 that acequia stewards raised
+  concerns about public mapping and that about 73% of acequia systems in the state map were
+  unnamed. This ingestion uses only publicly published OSE data and does not augment with stewards'
+  private records, local knowledge, unpublished names, or steward-collected maps without explicit
+  permission.
+
 ## Wikidata
 
 - Source id: `wikidata`
