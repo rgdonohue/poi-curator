@@ -7,7 +7,7 @@ from datetime import UTC, datetime
 from poi_curator_domain.db import POIEvidence
 from poi_curator_domain.text import slugify
 
-NRHP_SOURCE_ID = "nrhp_listed_properties"
+NRHP_SOURCE_ID = "nrhp"
 NM_STATE_REGISTER_SOURCE_ID = "nm_hpd_register_workbook"
 
 

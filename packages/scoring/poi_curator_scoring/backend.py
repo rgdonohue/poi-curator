@@ -1,16 +1,21 @@
 import logging
+from datetime import datetime
 from functools import lru_cache
 from typing import Literal, Protocol
 
 from poi_curator_domain.logging_utils import log_event
 from poi_curator_domain.schemas import (
+    AdminConflictListResponse,
+    AdminCoverageResponse,
     AdminMatchDiagnosticItem,
+    AdminMatchLogListResponse,
     AdminPOIDetailResponse,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
     AdminPOIListResponse,
     AdminPOIMapFeatureCollection,
     AdminPOIMapResponse,
+    AdminPOIProvenanceResponse,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
     AdminThemeSummaryItem,
@@ -104,6 +109,36 @@ class ScoringBackend(Protocol):
         status: str,
         limit: int,
     ) -> list[AdminMatchDiagnosticItem]: ...
+
+    def get_admin_poi_provenance(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIProvenanceResponse | None: ...
+
+    def get_admin_conflicts(
+        self,
+        db: Session,
+        *,
+        source_pair: str | None,
+        field_name: str | None,
+        limit: int,
+        offset: int,
+    ) -> AdminConflictListResponse: ...
+
+    def get_admin_coverage(self, db: Session) -> AdminCoverageResponse: ...
+
+    def get_admin_match_logs(
+        self,
+        db: Session,
+        *,
+        source: str | None,
+        decision: str | None,
+        start: datetime | None,
+        end: datetime | None,
+        limit: int,
+        offset: int,
+    ) -> AdminMatchLogListResponse: ...
 
     def get_admin_theme_summaries(
         self,
@@ -261,6 +296,49 @@ class FixtureScoringBackend:
             status=status,
             limit=limit,
         )
+
+    def get_admin_poi_provenance(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIProvenanceResponse | None:
+        del db, poi_id
+        return None
+
+    def get_admin_conflicts(
+        self,
+        db: Session,
+        *,
+        source_pair: str | None,
+        field_name: str | None,
+        limit: int,
+        offset: int,
+    ) -> AdminConflictListResponse:
+        del db, source_pair, field_name
+        return AdminConflictListResponse(items=[], total=0, limit=limit, offset=offset)
+
+    def get_admin_coverage(self, db: Session) -> AdminCoverageResponse:
+        del db
+        return AdminCoverageResponse(
+            by_source={},
+            by_source_pair={},
+            single_source_gaps={},
+            total_pois=0,
+        )
+
+    def get_admin_match_logs(
+        self,
+        db: Session,
+        *,
+        source: str | None,
+        decision: str | None,
+        start: datetime | None,
+        end: datetime | None,
+        limit: int,
+        offset: int,
+    ) -> AdminMatchLogListResponse:
+        del db, source, decision, start, end
+        return AdminMatchLogListResponse(items=[], total=0, limit=limit, offset=offset)
 
     def get_admin_theme_summaries(
         self,
@@ -527,6 +605,88 @@ class HybridScoringBackend(FixtureScoringBackend):
             status=status,
             limit=limit,
         )
+
+    def get_admin_poi_provenance(
+        self,
+        db: Session,
+        poi_id: str,
+    ) -> AdminPOIProvenanceResponse | None:
+        try:
+            return query_service.get_admin_poi_provenance(db, poi_id)
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_poi_provenance(db, poi_id)
+
+    def get_admin_conflicts(
+        self,
+        db: Session,
+        *,
+        source_pair: str | None,
+        field_name: str | None,
+        limit: int,
+        offset: int,
+    ) -> AdminConflictListResponse:
+        try:
+            return query_service.get_admin_conflicts(
+                db,
+                source_pair=source_pair,
+                field_name=field_name,
+                limit=limit,
+                offset=offset,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_conflicts(
+                db,
+                source_pair=source_pair,
+                field_name=field_name,
+                limit=limit,
+                offset=offset,
+            )
+
+    def get_admin_coverage(self, db: Session) -> AdminCoverageResponse:
+        try:
+            return query_service.get_admin_coverage(db)
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_coverage(db)
+
+    def get_admin_match_logs(
+        self,
+        db: Session,
+        *,
+        source: str | None,
+        decision: str | None,
+        start: datetime | None,
+        end: datetime | None,
+        limit: int,
+        offset: int,
+    ) -> AdminMatchLogListResponse:
+        try:
+            return query_service.get_admin_match_logs(
+                db,
+                source=source,
+                decision=decision,
+                start=start,
+                end=end,
+                limit=limit,
+                offset=offset,
+            )
+        except SQLAlchemyError:
+            if not self.allow_fixture_fallback:
+                raise
+            return super().get_admin_match_logs(
+                db,
+                source=source,
+                decision=decision,
+                start=start,
+                end=end,
+                limit=limit,
+                offset=offset,
+            )
 
     def get_admin_theme_summaries(
         self,

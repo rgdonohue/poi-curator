@@ -5,11 +5,14 @@ from poi_curator_domain.query_logging import list_query_logs
 from poi_curator_domain.schemas import (
     AdminAliasFromDiagnosticRequest,
     AdminAliasMutationResponse,
+    AdminConflictListResponse,
+    AdminCoverageResponse,
     AdminCreateAliasRequest,
     AdminIngestRunRequest,
     AdminIngestRunResponse,
     AdminIngestStatusResponse,
     AdminMatchDiagnosticItem,
+    AdminMatchLogListResponse,
     AdminPOIDetailResponse,
     AdminPOIEvidenceResponse,
     AdminPOIItem,
@@ -17,6 +20,7 @@ from poi_curator_domain.schemas import (
     AdminPOIMapResponse,
     AdminPOIPatchRequest,
     AdminPOIPatchResponse,
+    AdminPOIProvenanceResponse,
     AdminResolveDiagnosticRequest,
     AdminSuppressDiagnosticRequest,
     AdminThemeMembershipDetailResponse,
@@ -270,6 +274,66 @@ def admin_match_diagnostics(
         source_id=source_id,
         status=status,
         limit=limit,
+    )
+
+
+@router.get("/conflicts", response_model=AdminConflictListResponse)
+def admin_conflicts(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    source_pair: str | None = Query(default=None),
+    field_name: str | None = Query(default=None),
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> AdminConflictListResponse:
+    return backend.get_admin_conflicts(
+        db,
+        source_pair=source_pair,
+        field_name=field_name,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/pois/{poi_id}/provenance", response_model=AdminPOIProvenanceResponse)
+def admin_poi_provenance(
+    poi_id: str,
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> AdminPOIProvenanceResponse:
+    response = backend.get_admin_poi_provenance(db, poi_id)
+    if response is None:
+        raise HTTPException(status_code=404, detail="POI not found")
+    return response
+
+
+@router.get("/coverage", response_model=AdminCoverageResponse)
+def admin_coverage(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+) -> AdminCoverageResponse:
+    return backend.get_admin_coverage(db)
+
+
+@router.get("/match-logs", response_model=AdminMatchLogListResponse)
+def admin_match_logs(
+    db: DatabaseSession,
+    backend: ScoringBackendDep,
+    source: str | None = Query(default=None),
+    decision: str | None = Query(default=None),
+    start: datetime | None = OPTIONAL_DATETIME_QUERY,
+    end: datetime | None = OPTIONAL_DATETIME_QUERY,
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+) -> AdminMatchLogListResponse:
+    return backend.get_admin_match_logs(
+        db,
+        source=source,
+        decision=decision,
+        start=start,
+        end=end,
+        limit=limit,
+        offset=offset,
     )
 
 

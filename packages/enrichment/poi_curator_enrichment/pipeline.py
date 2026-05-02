@@ -24,6 +24,7 @@ from poi_curator_domain.historic_register import (
     build_state_register_evidence,
 )
 from poi_curator_domain.logging_utils import log_event
+from poi_curator_domain.provenance import record_sourced_field_values
 from poi_curator_domain.settings import get_settings
 from poi_curator_domain.text import slugify
 from sqlalchemy import delete, or_, select
@@ -200,6 +201,20 @@ def apply_wikidata_entity(
     if should_replace_short_description(poi, entity.description):
         poi.short_description = entity.description
     poi.updated_at = datetime.now(UTC)
+    record_sourced_field_values(
+        session,
+        poi_id=poi.poi_id,
+        source_id=WIKIDATA_SOURCE_ID,
+        values={
+            "name": entity.label,
+            "short_description": entity.description,
+            "wikidata_id": entity.entity_id,
+            "wikipedia_title": poi.wikipedia_title,
+        },
+        confidence=0.85,
+        canonical_fields={"wikidata_id", "wikipedia_title"},
+        observed_at=datetime.now(UTC),
+    )
 
     if poi.signals is not None:
         poi.signals.has_wikidata = True

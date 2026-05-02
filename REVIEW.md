@@ -218,6 +218,46 @@ Determinism check:
 - Pass/fail outcomes: identical, 6 passed and 0 failed in both runs.
 - Per-case score values: identical.
 - Result POI ordering: identical.
+
+## NRHP Follow-up Verification — 2026-05-01
+
+Changes made:
+- `tests/integration/test_multi_source_ingestion.py`: fixed the integration fixture cleanup that
+  deleted all `candidate_source = 'nrhp'` match logs. Cleanup now removes only fixture-owned NRHP
+  reference IDs.
+- `tests/unit/test_check_suites.py`: added a regression that inserts a production-style NRHP
+  match-log row, runs the check suite, and asserts the row is preserved.
+- `data/fixtures/eval_santa_fe.json`: promoted the editorial naming baseline from
+  `The Santa Fe Plaza` to `Santa Fe Plaza`.
+- `docs/EDITORIAL_NAMING_POLICY.md`: documented canonical display-name policy for register-order
+  person names, accents, leading articles, parenthetical labels, and infrastructure names.
+- Curation reports added under `reports/curation_outcomes/` for NRHP duplicate resolutions and
+  retained diagnostics triage.
+
+Database curation outcomes:
+- NRHP duplicate review: 4 duplicate NRHP-only canonicals were merged into existing common-name
+  canonicals and marked `superseded`; 2 district/scope cases were kept separate with legacy
+  evidence moved to the NRHP canonical.
+- Retained legacy diagnostics: 11 queued for next coordinate pass, 7 marked out of scope for now,
+  and 1 marked for manual curator coordinate review.
+- Field-level provenance: every current conflict row has exactly one canonical value flagged in
+  `poi_field_provenance`.
+
+Verification:
+- `.venv/bin/python -m pytest` - 166 passed.
+- `.venv/bin/ruff check tests/integration/test_multi_source_ingestion.py tests/unit/test_check_suites.py docs/EDITORIAL_NAMING_POLICY.md` - passed.
+- `.venv/bin/python scripts/run_check_suite.py --suite core-product` - 6 passed, 0 failed.
+  Output directory: `reports/check_runs/20260501T040459Z/`.
+- Post-check-suite match-log preservation: `poi_match_log` still contains 61 NRHP rows
+  (`18 match`, `43 new`).
+
+Baseline drift:
+- `nearby-plaza-history` now reports `Santa Fe Plaza` instead of `The Santa Fe Plaza`. This is an
+  intentional editorial naming-policy drift, not a scoring regression.
+- Score/order remained stable relative to the prior NRHP run: `Santa Fe Plaza` remains rank 2 with
+  score 73.3, behind `Palace of the Governors` at 77.4.
+- The expected-name fixture baseline was promoted to `Santa Fe Plaza` so future check-suite runs
+  enforce the new canonical display policy.
 - Determinism result: pass.
 
 Baseline promotion decision:

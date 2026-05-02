@@ -24,6 +24,9 @@
           <button type="button" class="nav-button is-active" data-view="poi-list">POI List</button>
           <button type="button" class="nav-button" data-view="poi-detail">POI Detail</button>
           <button type="button" class="nav-button" data-view="map-browser">Map Browser</button>
+          <button type="button" class="nav-button" data-view="conflicts">Conflicts</button>
+          <button type="button" class="nav-button" data-view="coverage">Coverage</button>
+          <button type="button" class="nav-button" data-view="match-logs">Match Logs</button>
           <button type="button" class="nav-button" data-view="query-logs">Query Logs</button>
           <button type="button" class="nav-button" data-view="status">Health & Source</button>
         </nav>
@@ -319,6 +322,118 @@
             <button type="button" id="query-log-prev" class="secondary-button">Previous</button>
             <span id="query-log-page">0 logs</span>
             <button type="button" id="query-log-next" class="secondary-button">Next</button>
+          </div>
+        </section>
+
+        <section id="view-conflicts" class="view" aria-labelledby="conflicts-title">
+          <div class="view-header">
+            <div>
+              <h1 id="conflicts-title">Conflicts</h1>
+              <p>Field-level source disagreements from canonical provenance rows.</p>
+            </div>
+            <button type="button" id="conflicts-refresh" class="primary-button">Refresh</button>
+          </div>
+          <form id="conflicts-filters" class="query-filter-bar">
+            <label class="field">
+              <span>Source pair</span>
+              <input id="conflict-source-pair" type="text" placeholder="osm,nrhp" />
+            </label>
+            <label class="field">
+              <span>Field</span>
+              <select id="conflict-field">
+                <option value="">Any</option>
+                <option value="name">name</option>
+                <option value="primary_category">primary_category</option>
+                <option value="coordinates">coordinates</option>
+                <option value="short_description">short_description</option>
+              </select>
+            </label>
+            <button type="submit" class="secondary-button">Apply</button>
+          </form>
+          <div id="conflicts-status" class="inline-message"></div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>poi</th>
+                  <th>field</th>
+                  <th>sources</th>
+                  <th>canonical</th>
+                  <th>last_observed</th>
+                </tr>
+              </thead>
+              <tbody id="conflicts-body">
+                <tr>
+                  <td colspan="5" class="empty-cell">Enter an admin key, then refresh.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section id="view-coverage" class="view" aria-labelledby="coverage-title">
+          <div class="view-header">
+            <div>
+              <h1 id="coverage-title">Coverage</h1>
+              <p>Source coverage counts and single-source gaps.</p>
+            </div>
+            <button type="button" id="coverage-refresh" class="primary-button">Refresh</button>
+          </div>
+          <div id="coverage-status" class="inline-message"></div>
+          <div id="coverage-content" class="status-grid"></div>
+        </section>
+
+        <section id="view-match-logs" class="view" aria-labelledby="match-log-title">
+          <div class="view-header">
+            <div>
+              <h1 id="match-log-title">Match Logs</h1>
+              <p>Source-to-canonical match decisions from ingestion.</p>
+            </div>
+            <button type="button" id="match-log-refresh" class="primary-button">Refresh</button>
+          </div>
+          <form id="match-log-filters" class="query-filter-bar">
+            <label class="field">
+              <span>Source</span>
+              <input id="match-log-source" type="text" placeholder="nrhp" />
+            </label>
+            <label class="field">
+              <span>Decision</span>
+              <select id="match-log-decision">
+                <option value="">Any</option>
+                <option value="match">match</option>
+                <option value="ambiguous">ambiguous</option>
+                <option value="new">new</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>Start</span>
+              <input id="match-log-start" type="datetime-local" />
+            </label>
+            <label class="field">
+              <span>End</span>
+              <input id="match-log-end" type="datetime-local" />
+            </label>
+            <button type="submit" class="secondary-button">Apply</button>
+          </form>
+          <div id="match-log-status" class="inline-message"></div>
+          <div class="table-shell">
+            <table>
+              <thead>
+                <tr>
+                  <th>source</th>
+                  <th>external_id</th>
+                  <th>decision</th>
+                  <th>strategy</th>
+                  <th>canonical</th>
+                  <th>decided_at</th>
+                </tr>
+              </thead>
+              <tbody id="match-log-body">
+                <tr>
+                  <td colspan="6" class="empty-cell">Enter an admin key, then refresh.</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </section>
 

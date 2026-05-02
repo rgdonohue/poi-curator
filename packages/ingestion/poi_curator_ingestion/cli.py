@@ -14,6 +14,8 @@ from poi_curator_ingestion.pipeline import (
     refresh_osm_region_from_current_raw,
     reset_osm_region,
 )
+from poi_curator_ingestion.sources.nrhp import ingest_nrhp_records
+from poi_curator_ingestion.sources.sf_arcgis import ingest_historic_district_memberships
 
 app = typer.Typer(help="POI Curator ingestion jobs.")
 
@@ -165,7 +167,59 @@ def refresh_osm(region: str = REGION_OPTION) -> None:
 
 @app.command("heritage")
 def ingest_heritage(region: str = typer.Option(..., help="Region slug to ingest.")) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        nrhp_summary = ingest_nrhp_records(session, region)
     typer.echo(
-        "[scaffold] Heritage overlay job placeholder. "
-        f"Implement NRHP/SHPO import for region={region}."
+        "\n".join(
+            [
+                f"region={nrhp_summary.region}",
+                f"nrhp_candidates={nrhp_summary.candidate_record_count}",
+                f"canonical_created={nrhp_summary.canonical_created}",
+                f"evidence_attached={nrhp_summary.evidence_attached}",
+                f"ambiguous={nrhp_summary.ambiguous_count}",
+                f"skipped_without_coordinates={nrhp_summary.skipped_without_coordinates}",
+                f"stale_deactivated={nrhp_summary.stale_deactivated}",
+            ]
+        )
+    )
+
+
+@app.command("nrhp")
+def ingest_nrhp(region: str = typer.Option(..., help="Region slug to ingest.")) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        summary = ingest_nrhp_records(session, region)
+    typer.echo(
+        "\n".join(
+            [
+                f"region={summary.region}",
+                f"candidate_records={summary.candidate_record_count}",
+                f"canonical_created={summary.canonical_created}",
+                f"evidence_attached={summary.evidence_attached}",
+                f"ambiguous={summary.ambiguous_count}",
+                f"skipped_without_coordinates={summary.skipped_without_coordinates}",
+                f"stale_deactivated={summary.stale_deactivated}",
+            ]
+        )
+    )
+
+
+@app.command("sf-historic-districts")
+def ingest_sf_historic_districts(
+    region: str = typer.Option(..., help="Region slug to ingest."),
+) -> None:
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        summary = ingest_historic_district_memberships(session, region)
+    typer.echo(
+        "\n".join(
+            [
+                f"region={summary.region}",
+                f"districts={summary.district_count}",
+                f"evidence_created={summary.evidence_created}",
+                f"evidence_updated={summary.evidence_updated}",
+                f"impacted_pois={summary.impacted_poi_count}",
+            ]
+        )
     )

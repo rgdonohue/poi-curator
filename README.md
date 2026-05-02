@@ -23,8 +23,9 @@ This is no longer just a scaffold. The repository currently includes:
 - FastAPI public and admin APIs
 - Postgres/PostGIS schema with Alembic migrations
 - OSM/Overpass ingestion and canonicalization pipeline
-- Wikidata, Santa Fe City GIS, NRHP, and New Mexico HPD enrichment paths
-- evidence, alias, diagnostic, and theme-membership tables
+- multi-source NRHP and City of Santa Fe historic-district ingestion alongside OSM
+- Wikidata and New Mexico HPD enrichment paths
+- evidence, alias, diagnostic, field-provenance, match-log, and theme-membership tables
 - deterministic route and nearby scoring with score breakdowns
 - editorial mutation paths for review state, aliases, match diagnostics, and theme overrides
 - fixture fallback scoring for tests and local API resilience
@@ -82,6 +83,9 @@ The frontend-facing API is under `/v1`:
 - `POST /v1/nearby/suggest`: rank stops near a center point
 - `POST /v1/point/suggest`: compatibility wrapper around nearby suggestions
 - `GET /v1/poi/{poi_id}`: detail, evidence, themes, provenance, and extended place context
+
+Admin-only endpoints also expose source conflicts, per-field provenance, coverage counts, and match
+logs for curation review.
 
 The backend does not compute turn-by-turn route geometry. For route suggestions it estimates
 detour cost geometrically from the supplied route and POI anchor. A frontend or routing provider
@@ -156,6 +160,8 @@ Notable entry points:
 - `apps/api/poi_curator_api/routes/admin.py`: editor/admin API
 - `packages/domain/poi_curator_domain/db.py`: SQLAlchemy/PostGIS ORM model
 - `packages/ingestion/poi_curator_ingestion/pipeline.py`: OSM ingest/canonicalization
+- `packages/ingestion/poi_curator_ingestion/matching.py`: source-to-canonical matching
+- `packages/ingestion/poi_curator_ingestion/sources`: NRHP and City GIS source adapters
 - `packages/enrichment/poi_curator_enrichment/pipeline.py`: enrichment and evidence rollup
 - `packages/scoring/poi_curator_scoring/query_service.py`: DB-backed query service
 - `packages/scoring/poi_curator_scoring/backend.py`: hybrid DB/fixture scoring backend
@@ -188,7 +194,8 @@ historical/cultural facts.
 ## Current Gaps
 
 - True network detour calculation is still outside this backend.
-- The admin UI directory is reserved; editor workflows currently use API endpoints and exports.
+- Admin viewer coverage is intentionally pragmatic; conflict, provenance, coverage, and match-log
+  views are available, while deeper resolution workflows remain API/editorial-service work.
 - Local check suites require a running PostGIS database.
 - Lint/typecheck still need broader cleanup around formatting and theme `Literal` typing.
 - The temporary description-enrichment scripts/reports are generated handoff artifacts.
@@ -198,5 +205,7 @@ historical/cultural facts.
 - `docs/DATA_QUALITY_GOVERNANCE.md`: data classes, synthetic data policy, source-bias caveats,
   export governance, and review roadmap
 - `docs/METHODOLOGY.md`: implemented source, processing, scoring, and review methodology
+- `docs/SOURCES.md`: source URLs, scope, licensing notes, mappings, and match strategy notes
+- `docs/PROVENANCE_MODEL.md`: field provenance schema and conflict policy
 - `docs/DESCRIPTION_ENRICHMENT_WORKFLOW.md`: temporary generated-description workflow and review
   constraints

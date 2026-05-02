@@ -14,6 +14,8 @@ from poi_curator_domain.db import (
     POIAlias,
     POIEditorial,
     POIEvidence,
+    POIFieldProvenance,
+    POIMatchLog,
     POISignals,
     POISourceRaw,
     POIThemeEditorial,
@@ -23,6 +25,7 @@ from poi_curator_domain.db import (
 )
 from poi_curator_domain.descriptions import description_quality_score
 from poi_curator_domain.logging_utils import log_event
+from poi_curator_domain.provenance import OSM_PROVENANCE_SOURCE_ID, record_canonical_provenance
 from poi_curator_domain.regions import RegionSpec
 from poi_curator_domain.theme_service import sync_theme_memberships
 from sqlalchemy import delete, false, select, true
@@ -337,6 +340,8 @@ def delete_poi_dependents(session: Session, poi_ids: Sequence[str]) -> None:
     session.execute(delete(POIThemeEditorial).where(POIThemeEditorial.poi_id.in_(poi_ids)))
     session.execute(delete(POIThemeMembership).where(POIThemeMembership.poi_id.in_(poi_ids)))
     session.execute(delete(POIAlias).where(POIAlias.poi_id.in_(poi_ids)))
+    session.execute(delete(POIMatchLog).where(POIMatchLog.canonical_poi_id.in_(poi_ids)))
+    session.execute(delete(POIFieldProvenance).where(POIFieldProvenance.poi_id.in_(poi_ids)))
     session.execute(delete(POIEvidence).where(POIEvidence.poi_id.in_(poi_ids)))
     session.execute(delete(POIEditorial).where(POIEditorial.poi_id.in_(poi_ids)))
     session.execute(delete(POISignals).where(POISignals.poi_id.in_(poi_ids)))
@@ -426,14 +431,47 @@ def upsert_canonical_poi(
         )
         session.add(poi)
         session.flush()
+        session.add(
+            POIMatchLog(
+                canonical_poi_id=poi.poi_id,
+                candidate_source=OSM_PROVENANCE_SOURCE_ID,
+                candidate_external_id=normalized.source_record_id,
+                match_strategy="source_identifier",
+                match_score=1.0,
+                decision="new",
+                decided_at=datetime.now(UTC),
+                decided_by="ingest:osm",
+                notes="Created from OSM source record.",
+            )
+        )
     else:
         conflicts = update_existing_poi_from_osm(poi, normalized)
         emit_canonical_overwrite_diagnostic(session, poi, normalized, conflicts)
         poi.is_active = True
         if poi.review_status == "stale":
             poi.review_status = "needs_review"
+        session.add(
+            POIMatchLog(
+                canonical_poi_id=poi.poi_id,
+                candidate_source=OSM_PROVENANCE_SOURCE_ID,
+                candidate_external_id=normalized.source_record_id,
+                match_strategy="source_identifier",
+                match_score=1.0,
+                decision="match",
+                decided_at=datetime.now(UTC),
+                decided_by="ingest:osm",
+                notes="Matched existing canonical POI by OSM source identifier.",
+            )
+        )
 
     raw_record.canonical_poi = poi
+    record_canonical_provenance(
+        session,
+        poi,
+        source_id=OSM_PROVENANCE_SOURCE_ID,
+        confidence=0.8,
+        observed_at=datetime.now(UTC),
+    )
     upsert_signals(session, poi, raw_record.raw_payload_json.get("tags", {}))
     ensure_editorial_stub(session, poi)
     sync_theme_memberships(session, [poi])

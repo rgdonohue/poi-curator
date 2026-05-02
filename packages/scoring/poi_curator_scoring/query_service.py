@@ -16,12 +16,21 @@ from poi_curator_domain.db import (
     POI,
     OfficialMatchDiagnostic,
     POIEvidence,
+    POIFieldProvenance,
+    POIMatchLog,
     POIThemeMembership,
 )
 from poi_curator_domain.descriptions import choose_short_description_for_poi
 from poi_curator_domain.logging_utils import log_event
+from poi_curator_domain.provenance import provenance_conflicts, stable_value_key
 from poi_curator_domain.schemas import (
+    AdminConflictItem,
+    AdminConflictListResponse,
+    AdminCoverageResponse,
+    AdminFieldProvenanceItem,
     AdminMatchDiagnosticItem,
+    AdminMatchLogItem,
+    AdminMatchLogListResponse,
     AdminPOIAliasItem,
     AdminPOIDetailEvidenceItem,
     AdminPOIDetailMatchDiagnosticItem,
@@ -37,6 +46,7 @@ from poi_curator_domain.schemas import (
     AdminPOIMapFeatureGeometry,
     AdminPOIMapFeatureProperties,
     AdminPOIMapResponse,
+    AdminPOIProvenanceResponse,
     AdminThemeMembershipDetailResponse,
     AdminThemeMembershipQueueItem,
     AdminThemeSummaryItem,
@@ -323,6 +333,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
             joinedload(POI.signals),
             joinedload(POI.editorial),
             joinedload(POI.evidence_items),
+            joinedload(POI.field_provenance),
             joinedload(POI.aliases),
             joinedload(POI.theme_memberships).joinedload(POIThemeMembership.evidence_links),
             joinedload(POI.theme_editorials),
@@ -356,6 +367,7 @@ def get_poi_detail(db: Session, poi_id: str) -> POIDetailResponse | None:
             "wikidata_id": poi.wikidata_id,
             "wikipedia_title": poi.wikipedia_title,
             "raw_source_count": len(poi.raw_sources),
+            "field_sources": _field_sources(poi.field_provenance),
         },
         evidence=[
             {
@@ -788,6 +800,165 @@ def get_admin_match_diagnostics(
     return [build_admin_match_diagnostic_item(item) for item in diagnostics]
 
 
+def get_admin_poi_provenance(
+    db: Session,
+    poi_id: str,
+) -> AdminPOIProvenanceResponse | None:
+    poi = db.scalar(
+        select(POI)
+        .where(POI.poi_id == poi_id)
+        .options(joinedload(POI.field_provenance))
+    )
+    if poi is None:
+        return None
+    rows = sorted(
+        poi.field_provenance,
+        key=lambda row: (row.field_name, not row.is_canonical, row.source_id, row.observed_at),
+    )
+    by_field: dict[str, list[AdminFieldProvenanceItem]] = {}
+    for row in rows:
+        by_field.setdefault(row.field_name, []).append(_build_field_provenance_item(row))
+    conflict_rows = provenance_conflicts(rows)
+    return AdminPOIProvenanceResponse(
+        poi_id=poi.poi_id,
+        name=poi.canonical_name,
+        fields=by_field,
+        conflicts={
+            field_name: [_build_field_provenance_item(row) for row in field_rows]
+            for field_name, field_rows in conflict_rows.items()
+        },
+    )
+
+
+def get_admin_conflicts(
+    db: Session,
+    *,
+    source_pair: str | None,
+    field_name: str | None,
+    limit: int,
+    offset: int,
+) -> AdminConflictListResponse:
+    rows = db.scalars(
+        select(POIFieldProvenance)
+        .join(POI)
+        .options(joinedload(POIFieldProvenance.poi))
+        .order_by(POIFieldProvenance.observed_at.desc(), POIFieldProvenance.id.desc())
+    ).all()
+    requested_sources = {
+        item.strip() for item in source_pair.split(",")
+    } if source_pair else set()
+    grouped: dict[tuple[str, str], list[POIFieldProvenance]] = {}
+    for row in rows:
+        if field_name is not None and row.field_name != field_name:
+            continue
+        grouped.setdefault((row.poi_id, row.field_name), []).append(row)
+
+    items: list[AdminConflictItem] = []
+    for (_poi_id, grouped_field), field_rows in grouped.items():
+        if len({stable_value_key(row.value) for row in field_rows}) <= 1:
+            continue
+        sources = sorted({row.source_id for row in field_rows})
+        if requested_sources and not requested_sources.issubset(set(sources)):
+            continue
+        canonical_row = next((row for row in field_rows if row.is_canonical), None)
+        poi = field_rows[0].poi
+        items.append(
+            AdminConflictItem(
+                poi_id=poi.poi_id,
+                name=poi.canonical_name,
+                field_name=grouped_field,
+                canonical_value=canonical_row.value if canonical_row is not None else None,
+                sources=sources,
+                values=[_build_field_provenance_item(row) for row in field_rows],
+                last_observed_at=max(row.observed_at for row in field_rows),
+            )
+        )
+    items.sort(key=lambda item: (item.last_observed_at, item.poi_id, item.field_name), reverse=True)
+    total = len(items)
+    return AdminConflictListResponse(
+        items=items[offset : offset + limit],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
+
+
+def get_admin_coverage(db: Session) -> AdminCoverageResponse:
+    rows = db.scalars(select(POIFieldProvenance)).all()
+    sources_by_poi: dict[str, set[str]] = {}
+    for row in rows:
+        sources_by_poi.setdefault(row.poi_id, set()).add(row.source_id)
+    total_pois = db.scalar(select(func.count()).select_from(POI)) or 0
+    by_source: dict[str, int] = {}
+    by_source_pair: dict[str, int] = {}
+    single_source_gaps: dict[str, int] = {}
+    for sources in sources_by_poi.values():
+        for source in sources:
+            by_source[source] = by_source.get(source, 0) + 1
+        sorted_sources = sorted(sources)
+        if len(sorted_sources) == 1:
+            only = sorted_sources[0]
+            single_source_gaps[only] = single_source_gaps.get(only, 0) + 1
+        for left_index, left in enumerate(sorted_sources):
+            for right in sorted_sources[left_index + 1 :]:
+                key = f"{left}+{right}"
+                by_source_pair[key] = by_source_pair.get(key, 0) + 1
+    return AdminCoverageResponse(
+        by_source=dict(sorted(by_source.items())),
+        by_source_pair=dict(sorted(by_source_pair.items())),
+        single_source_gaps=dict(sorted(single_source_gaps.items())),
+        total_pois=int(total_pois),
+    )
+
+
+def get_admin_match_logs(
+    db: Session,
+    *,
+    source: str | None,
+    decision: str | None,
+    start: datetime | None,
+    end: datetime | None,
+    limit: int,
+    offset: int,
+) -> AdminMatchLogListResponse:
+    query = select(POIMatchLog).options(joinedload(POIMatchLog.canonical_poi))
+    if source is not None:
+        query = query.where(POIMatchLog.candidate_source == source)
+    if decision is not None:
+        query = query.where(POIMatchLog.decision == decision)
+    if start is not None:
+        query = query.where(POIMatchLog.decided_at >= start)
+    if end is not None:
+        query = query.where(POIMatchLog.decided_at <= end)
+    all_rows = db.scalars(
+        query.order_by(POIMatchLog.decided_at.desc(), POIMatchLog.id.desc())
+    ).all()
+    page = all_rows[offset : offset + limit]
+    return AdminMatchLogListResponse(
+        items=[
+            AdminMatchLogItem(
+                id=row.id,
+                canonical_poi_id=row.canonical_poi_id,
+                canonical_name=row.canonical_poi.canonical_name
+                if row.canonical_poi is not None
+                else None,
+                candidate_source=row.candidate_source,
+                candidate_external_id=row.candidate_external_id,
+                match_strategy=row.match_strategy,
+                match_score=row.match_score,
+                decision=row.decision,
+                decided_at=row.decided_at,
+                decided_by=row.decided_by,
+                notes=row.notes,
+            )
+            for row in page
+        ],
+        total=len(all_rows),
+        limit=limit,
+        offset=offset,
+    )
+
+
 def _load_admin_poi_browser_records(
     db: Session,
     *,
@@ -879,6 +1050,25 @@ def _load_admin_poi_browser_records(
         )
 
     return records
+
+
+def _build_field_provenance_item(row: POIFieldProvenance) -> AdminFieldProvenanceItem:
+    return AdminFieldProvenanceItem(
+        id=row.id,
+        field_name=row.field_name,
+        source_id=row.source_id,
+        value=row.value,
+        confidence=row.confidence,
+        observed_at=row.observed_at,
+        is_canonical=row.is_canonical,
+    )
+
+
+def _field_sources(rows: Sequence[POIFieldProvenance]) -> dict[str, list[str]]:
+    sources: dict[str, set[str]] = {}
+    for row in rows:
+        sources.setdefault(row.field_name, set()).add(row.source_id)
+    return {field_name: sorted(field_sources) for field_name, field_sources in sources.items()}
 
 
 def _load_match_diagnostics_by_poi_ids(

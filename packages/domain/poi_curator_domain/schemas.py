@@ -385,6 +385,68 @@ class AdminPOIDetailResponse(BaseModel):
     last_updated: datetime
 
 
+class AdminFieldProvenanceItem(BaseModel):
+    id: int
+    field_name: str
+    source_id: str
+    value: Any
+    confidence: float
+    observed_at: datetime
+    is_canonical: bool
+
+
+class AdminPOIProvenanceResponse(BaseModel):
+    poi_id: str
+    name: str
+    fields: dict[str, list[AdminFieldProvenanceItem]]
+    conflicts: dict[str, list[AdminFieldProvenanceItem]] = Field(default_factory=dict)
+
+
+class AdminConflictItem(BaseModel):
+    poi_id: str
+    name: str
+    field_name: str
+    canonical_value: Any | None = None
+    sources: list[str]
+    values: list[AdminFieldProvenanceItem]
+    last_observed_at: datetime
+
+
+class AdminConflictListResponse(BaseModel):
+    items: list[AdminConflictItem]
+    total: int
+    limit: int
+    offset: int
+
+
+class AdminCoverageResponse(BaseModel):
+    by_source: dict[str, int]
+    by_source_pair: dict[str, int]
+    single_source_gaps: dict[str, int]
+    total_pois: int
+
+
+class AdminMatchLogItem(BaseModel):
+    id: int
+    canonical_poi_id: str | None = None
+    canonical_name: str | None = None
+    candidate_source: str
+    candidate_external_id: str | None = None
+    match_strategy: str
+    match_score: float | None = None
+    decision: str
+    decided_at: datetime
+    decided_by: str | None = None
+    notes: str | None = None
+
+
+class AdminMatchLogListResponse(BaseModel):
+    items: list[AdminMatchLogItem]
+    total: int
+    limit: int
+    offset: int
+
+
 class AdminPOIMapFeatureGeometry(BaseModel):
     type: Literal["Point"] = "Point"
     coordinates: list[float]

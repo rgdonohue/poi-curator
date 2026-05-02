@@ -18,6 +18,9 @@ const state = {
   queryLogs: [],
   queryLogTotal: 0,
   queryLogOffset: 0,
+  conflicts: [],
+  coverage: null,
+  matchLogs: [],
   expandedLogId: null,
   mapBrowser: null,
   detailMap: null,
@@ -39,6 +42,9 @@ function cacheElements() {
     "poi-list": document.getElementById("view-poi-list"),
     "poi-detail": document.getElementById("view-poi-detail"),
     "map-browser": document.getElementById("view-map-browser"),
+    conflicts: document.getElementById("view-conflicts"),
+    coverage: document.getElementById("view-coverage"),
+    "match-logs": document.getElementById("view-match-logs"),
     "query-logs": document.getElementById("view-query-logs"),
     status: document.getElementById("view-status"),
   };
@@ -86,6 +92,17 @@ function cacheElements() {
   els.queryLogPrev = document.getElementById("query-log-prev");
   els.queryLogNext = document.getElementById("query-log-next");
   els.queryLogPage = document.getElementById("query-log-page");
+  els.conflictsRefresh = document.getElementById("conflicts-refresh");
+  els.conflictsFilters = document.getElementById("conflicts-filters");
+  els.conflictsStatus = document.getElementById("conflicts-status");
+  els.conflictsBody = document.getElementById("conflicts-body");
+  els.coverageRefresh = document.getElementById("coverage-refresh");
+  els.coverageStatus = document.getElementById("coverage-status");
+  els.coverageContent = document.getElementById("coverage-content");
+  els.matchLogRefresh = document.getElementById("match-log-refresh");
+  els.matchLogFilters = document.getElementById("match-log-filters");
+  els.matchLogStatus = document.getElementById("match-log-status");
+  els.matchLogBody = document.getElementById("match-log-body");
   els.statusRefresh = document.getElementById("status-refresh");
   els.healthRaw = document.getElementById("health-raw");
   els.configRaw = document.getElementById("config-raw");
@@ -115,6 +132,9 @@ function bindEvents() {
     void loadPoiList();
     void loadQueryLogs();
     void loadMapPois();
+    void loadConflicts();
+    void loadCoverage();
+    void loadMatchLogs();
   });
 
   els.clearKeyButton.addEventListener("click", () => {
@@ -123,9 +143,15 @@ function bindEvents() {
     updateKeyStatus();
     state.poiList = [];
     state.queryLogs = [];
+    state.conflicts = [];
+    state.coverage = null;
+    state.matchLogs = [];
     state.mapPayload = null;
     renderPoiList();
     renderQueryLogs();
+    renderConflicts();
+    renderCoverage();
+    renderMatchLogs();
     updateMapSource(EMPTY_COLLECTION);
   });
 
@@ -247,6 +273,42 @@ function bindEvents() {
     }
   });
 
+  els.conflictsRefresh.addEventListener("click", () => {
+    void loadConflicts();
+  });
+
+  els.conflictsFilters.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void loadConflicts();
+  });
+
+  els.conflictsBody.addEventListener("click", (event) => {
+    const poiLink = event.target.closest("[data-poi-id]");
+    if (poiLink) {
+      void openPoiFromLink(poiLink.dataset.poiId);
+    }
+  });
+
+  els.coverageRefresh.addEventListener("click", () => {
+    void loadCoverage();
+  });
+
+  els.matchLogRefresh.addEventListener("click", () => {
+    void loadMatchLogs();
+  });
+
+  els.matchLogFilters.addEventListener("submit", (event) => {
+    event.preventDefault();
+    void loadMatchLogs();
+  });
+
+  els.matchLogBody.addEventListener("click", (event) => {
+    const poiLink = event.target.closest("[data-poi-id]");
+    if (poiLink) {
+      void openPoiFromLink(poiLink.dataset.poiId);
+    }
+  });
+
   els.statusRefresh.addEventListener("click", () => {
     void loadStatus();
   });
@@ -258,6 +320,9 @@ async function boot() {
     void loadPoiList();
     void loadQueryLogs();
     void loadMapPois();
+    void loadConflicts();
+    void loadCoverage();
+    void loadMatchLogs();
   }
 }
 
@@ -276,6 +341,15 @@ function showView(view) {
     if (hasAdminKey()) {
       void loadMapPois();
     }
+  }
+  if (view === "conflicts" && hasAdminKey()) {
+    void loadConflicts();
+  }
+  if (view === "coverage" && hasAdminKey()) {
+    void loadCoverage();
+  }
+  if (view === "match-logs" && hasAdminKey()) {
+    void loadMatchLogs();
   }
 }
 
@@ -490,6 +564,7 @@ function renderPoiDetail(poi, container, options = {}) {
   right.className = "detail-column";
 
   left.appendChild(renderCanonicalFields(canonical, adminDetail?.editorial_overrides || {}));
+  left.appendChild(renderFieldProvenance(canonical.provenance?.field_sources || {}));
   left.appendChild(renderEvidence(adminDetail?.evidence || canonical.evidence || []));
   left.appendChild(renderThemes(adminDetail?.themes || canonical.themes || []));
 
@@ -511,6 +586,33 @@ function renderPoiDetail(poi, container, options = {}) {
   if (options.includeMap) {
     initDetailMap(canonical.coordinates);
   }
+}
+
+function renderFieldProvenance(fieldSources) {
+  const card = detailCard("Field Provenance");
+  const fields = Object.entries(fieldSources || {});
+  if (!fields.length) {
+    card.appendChild(emptyState("No field-level provenance is recorded for this POI."));
+    return card;
+  }
+  fields.forEach(([field, sources]) => {
+    const row = document.createElement("div");
+    row.className = "provenance-row";
+    const name = document.createElement("span");
+    name.className = "field-name-inline";
+    name.textContent = field;
+    const badges = document.createElement("span");
+    badges.className = "link-row";
+    (sources || []).forEach((source) => {
+      const badge = document.createElement("span");
+      badge.className = "badge";
+      badge.textContent = source;
+      badges.appendChild(badge);
+    });
+    row.append(name, badges);
+    card.appendChild(row);
+  });
+  return card;
 }
 
 function renderCanonicalFields(poi, overrides = {}) {
@@ -990,6 +1092,174 @@ function renderQueryLogs() {
   els.queryLogPage.textContent = `${start}-${end} of ${state.queryLogTotal}`;
   els.queryLogPrev.disabled = state.queryLogOffset <= 0;
   els.queryLogNext.disabled = state.queryLogOffset + LOG_PAGE_SIZE >= state.queryLogTotal;
+}
+
+async function loadConflicts() {
+  if (!hasAdminKey()) {
+    els.conflictsStatus.textContent = "Enter an admin key, then refresh.";
+    renderConflicts();
+    return;
+  }
+  els.conflictsStatus.textContent = "Loading conflicts...";
+  try {
+    const payload = await requestJson("/v1/admin/conflicts", {
+      admin: true,
+      params: {
+        source_pair: document.getElementById("conflict-source-pair").value.trim(),
+        field_name: document.getElementById("conflict-field").value,
+        limit: 100,
+        offset: 0,
+      },
+    });
+    state.conflicts = payload.items || [];
+    els.conflictsStatus.textContent = `${payload.total || 0} conflict(s)`;
+    renderConflicts();
+  } catch (error) {
+    state.conflicts = [];
+    els.conflictsStatus.textContent = error.message;
+    renderConflicts();
+  }
+}
+
+function renderConflicts() {
+  els.conflictsBody.innerHTML = "";
+  if (!state.conflicts.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 5;
+    cell.className = "empty-cell";
+    cell.textContent = hasAdminKey() ? "No conflicts match the filters." : "Enter an admin key.";
+    row.appendChild(cell);
+    els.conflictsBody.appendChild(row);
+    return;
+  }
+  state.conflicts.forEach((conflict) => {
+    const row = document.createElement("tr");
+    row.append(
+      poiButtonCell(conflict.name, conflict.poi_id),
+      tableCell(conflict.field_name),
+      tableCell((conflict.sources || []).join(", ")),
+      tableCell(formatCompact(conflict.canonical_value)),
+      tableCell(formatDate(conflict.last_observed_at))
+    );
+    els.conflictsBody.appendChild(row);
+  });
+}
+
+async function loadCoverage() {
+  if (!hasAdminKey()) {
+    els.coverageStatus.textContent = "Enter an admin key, then refresh.";
+    renderCoverage();
+    return;
+  }
+  els.coverageStatus.textContent = "Loading coverage...";
+  try {
+    state.coverage = await requestJson("/v1/admin/coverage", { admin: true });
+    els.coverageStatus.textContent = `total_pois=${state.coverage.total_pois || 0}`;
+    renderCoverage();
+  } catch (error) {
+    state.coverage = null;
+    els.coverageStatus.textContent = error.message;
+    renderCoverage();
+  }
+}
+
+function renderCoverage() {
+  els.coverageContent.innerHTML = "";
+  if (!state.coverage) {
+    els.coverageContent.appendChild(emptyState("No coverage payload loaded."));
+    return;
+  }
+  [
+    ["By Source", state.coverage.by_source],
+    ["By Source Pair", state.coverage.by_source_pair],
+    ["Single Source Gaps", state.coverage.single_source_gaps],
+  ].forEach(([title, values]) => {
+    const card = detailCard(title);
+    const table = document.createElement("div");
+    table.className = "field-table";
+    Object.entries(values || {}).forEach(([key, value]) => {
+      const name = document.createElement("div");
+      name.className = "field-name";
+      name.textContent = key;
+      const count = document.createElement("div");
+      count.className = "field-value";
+      count.textContent = value;
+      table.append(name, count);
+    });
+    card.appendChild(table);
+    els.coverageContent.appendChild(card);
+  });
+}
+
+async function loadMatchLogs() {
+  if (!hasAdminKey()) {
+    els.matchLogStatus.textContent = "Enter an admin key, then refresh.";
+    renderMatchLogs();
+    return;
+  }
+  els.matchLogStatus.textContent = "Loading match logs...";
+  try {
+    const payload = await requestJson("/v1/admin/match-logs", {
+      admin: true,
+      params: {
+        source: document.getElementById("match-log-source").value.trim(),
+        decision: document.getElementById("match-log-decision").value,
+        start: localDateTimeToIso(document.getElementById("match-log-start").value),
+        end: localDateTimeToIso(document.getElementById("match-log-end").value),
+        limit: 100,
+        offset: 0,
+      },
+    });
+    state.matchLogs = payload.items || [];
+    els.matchLogStatus.textContent = `${payload.total || 0} log(s)`;
+    renderMatchLogs();
+  } catch (error) {
+    state.matchLogs = [];
+    els.matchLogStatus.textContent = error.message;
+    renderMatchLogs();
+  }
+}
+
+function renderMatchLogs() {
+  els.matchLogBody.innerHTML = "";
+  if (!state.matchLogs.length) {
+    const row = document.createElement("tr");
+    const cell = document.createElement("td");
+    cell.colSpan = 6;
+    cell.className = "empty-cell";
+    cell.textContent = hasAdminKey() ? "No match logs found." : "Enter an admin key.";
+    row.appendChild(cell);
+    els.matchLogBody.appendChild(row);
+    return;
+  }
+  state.matchLogs.forEach((log) => {
+    const row = document.createElement("tr");
+    row.append(
+      tableCell(log.candidate_source),
+      tableCell(log.candidate_external_id),
+      tableCell(log.decision),
+      tableCell(log.match_strategy),
+      poiButtonCell(log.canonical_name || log.canonical_poi_id || "", log.canonical_poi_id),
+      tableCell(formatDate(log.decided_at))
+    );
+    els.matchLogBody.appendChild(row);
+  });
+}
+
+function poiButtonCell(label, poiId) {
+  const cell = document.createElement("td");
+  if (!poiId) {
+    cell.textContent = label || "";
+    return cell;
+  }
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "nav-button";
+  button.dataset.poiId = poiId;
+  button.textContent = label || poiId;
+  cell.appendChild(button);
+  return cell;
 }
 
 function logCell(value, logId) {

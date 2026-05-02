@@ -1,6 +1,7 @@
 from collections.abc import Generator
 from datetime import datetime
 from functools import lru_cache
+from typing import Any
 from uuid import uuid4
 
 from geoalchemy2 import Geometry
@@ -132,6 +133,8 @@ class POI(Base):
     raw_sources: Mapped[list[POISourceRaw]] = relationship(back_populates="canonical_poi")
     aliases: Mapped[list["POIAlias"]] = relationship(back_populates="poi")
     evidence_items: Mapped[list["POIEvidence"]] = relationship(back_populates="poi")
+    field_provenance: Mapped[list["POIFieldProvenance"]] = relationship(back_populates="poi")
+    match_logs: Mapped[list["POIMatchLog"]] = relationship(back_populates="canonical_poi")
     theme_memberships: Mapped[list["POIThemeMembership"]] = relationship(back_populates="poi")
     theme_editorials: Mapped[list["POIThemeEditorial"]] = relationship(back_populates="poi")
     match_diagnostics: Mapped[list["OfficialMatchDiagnostic"]] = relationship(
@@ -266,6 +269,38 @@ class POIEvidence(Base):
     theme_membership_links: Mapped[list["POIThemeMembershipEvidence"]] = relationship(
         back_populates="evidence"
     )
+
+
+class POIFieldProvenance(Base):
+    __tablename__ = "poi_field_provenance"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    poi_id: Mapped[str] = mapped_column(ForeignKey("poi.poi_id"), nullable=False)
+    field_name: Mapped[str] = mapped_column(String(64), nullable=False)
+    source_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    value: Mapped[Any] = mapped_column(JSONB, nullable=False)
+    confidence: Mapped[float] = mapped_column(Float, default=0.0, nullable=False)
+    observed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_canonical: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    poi: Mapped[POI] = relationship(back_populates="field_provenance")
+
+
+class POIMatchLog(Base):
+    __tablename__ = "poi_match_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    canonical_poi_id: Mapped[str | None] = mapped_column(ForeignKey("poi.poi_id"))
+    candidate_source: Mapped[str] = mapped_column(String(128), nullable=False)
+    candidate_external_id: Mapped[str | None] = mapped_column(String(255))
+    match_strategy: Mapped[str] = mapped_column(String(64), nullable=False)
+    match_score: Mapped[float | None] = mapped_column(Float)
+    decision: Mapped[str] = mapped_column(String(32), nullable=False)
+    decided_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    decided_by: Mapped[str | None] = mapped_column(String(255))
+    notes: Mapped[str | None] = mapped_column(Text)
+
+    canonical_poi: Mapped[POI | None] = relationship(back_populates="match_logs")
 
 
 class POIThemeMembership(Base):

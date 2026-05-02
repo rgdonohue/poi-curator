@@ -1,6 +1,9 @@
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
+import pytest
+from poi_curator_domain.db import POIMatchLog, get_session_factory
 from poi_curator_scoring.check_suites import (
     CheckSuite,
     SuiteRunArtifact,
@@ -10,7 +13,10 @@ from poi_curator_scoring.check_suites import (
     resolve_suite_cases,
 )
 from poi_curator_scoring.checks import CheckReport, CheckRun
+from sqlalchemy import delete, select, text
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
+from scripts import run_check_suite
 from scripts.run_check_suite import parse_frozen_time, resolve_output_dir
 
 
@@ -100,3 +106,63 @@ def test_render_suite_index_markdown_includes_paths_and_counts() -> None:
     assert "rail-smoke" in markdown
     assert "rail-smoke.json" in markdown
     assert "Passed: 1" in markdown
+
+
+def test_check_suite_preserves_existing_production_match_logs(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    session_factory = get_session_factory()
+    sentinel_external_id = f"sentinel-real-nrhp-{uuid4()}"
+    try:
+        with session_factory() as session:
+            session.execute(text("select 1 from poi_match_log limit 1"))
+            session.add(
+                POIMatchLog(
+                    canonical_poi_id=None,
+                    candidate_source="nrhp",
+                    candidate_external_id=sentinel_external_id,
+                    match_strategy="spatial_name",
+                    match_score=1.0,
+                    decision="match",
+                    decided_at=datetime.now(UTC),
+                    decided_by="ingest:nrhp",
+                    notes="Regression sentinel: check suite must not delete production run logs.",
+                )
+            )
+            session.commit()
+    except (OperationalError, ProgrammingError):
+        pytest.skip("Local Postgres with latest migrations is not available.")
+
+    try:
+        monkeypatch.setattr(
+            "sys.argv",
+            [
+                "run_check_suite.py",
+                "--suite",
+                "core-product",
+                "--out-dir",
+                str(tmp_path / "check-run"),
+                "--allow-fixture-fallback",
+            ],
+        )
+
+        assert run_check_suite.main() == 0
+
+        with session_factory() as session:
+            preserved = session.scalar(
+                select(POIMatchLog).where(
+                    POIMatchLog.candidate_source == "nrhp",
+                    POIMatchLog.candidate_external_id == sentinel_external_id,
+                )
+            )
+            assert preserved is not None
+    finally:
+        with session_factory() as session:
+            session.execute(
+                delete(POIMatchLog).where(
+                    POIMatchLog.candidate_source == "nrhp",
+                    POIMatchLog.candidate_external_id == sentinel_external_id,
+                )
+            )
+            session.commit()

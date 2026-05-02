@@ -470,11 +470,25 @@ pre {
 .evidence-group,
 .theme-item,
 .diagnostic-item,
+.provenance-row,
 .query-log-detail {
   border: 1px solid var(--border);
   border-radius: 6px;
   padding: 10px;
   margin-top: 8px;
+}
+
+.provenance-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.field-name-inline {
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 11px;
 }
 
 .evidence-group h3,
