@@ -209,3 +209,7 @@ historical/cultural facts.
 - `docs/PROVENANCE_MODEL.md`: field provenance schema and conflict policy
 - `docs/DESCRIPTION_ENRICHMENT_WORKFLOW.md`: temporary generated-description workflow and review
   constraints
+
+## Related Work
+
+[OpenPOIs](https://openpois.org/) is a complementary national spatial-spine project that conflates OSM and Overture Maps with confidence/staleness scoring; POI Curator's role is the editorial, provenance, and interpretive layer above that kind of spine.

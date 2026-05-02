@@ -53,6 +53,8 @@ Primary sources:
 - City of Santa Fe GIS / ArcGIS REST layers
 - official state/federal heritage spatial data where available
 
+OpenPOIs is a candidate alternative source for this spatial-spine layer in future geographies, especially before a second-city deployment. See `docs/STRATEGIC_NOTES.md` for context; this is not a current Santa Fe ingestion action.
+
 ### 2. Institutional corroboration
 
 Use to answer:
