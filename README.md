@@ -23,14 +23,15 @@ This is no longer just a scaffold. The repository currently includes:
 - FastAPI public and admin APIs
 - Postgres/PostGIS schema with Alembic migrations
 - OSM/Overpass ingestion and canonicalization pipeline
-- multi-source NRHP and City of Santa Fe historic-district ingestion alongside OSM
-- Wikidata and New Mexico HPD enrichment paths
-- evidence, alias, diagnostic, field-provenance, match-log, and theme-membership tables
+- multi-source NRHP, GNIS, NMOSE POD/acequia, and City of Santa Fe source ingestion alongside OSM
+- Wikidata, City GIS, NRHP, and New Mexico HPD enrichment paths
+- evidence, alias, diagnostic, field-provenance, match-log, query-log, and theme-membership tables
 - deterministic route and nearby scoring with score breakdowns
 - editorial mutation paths for review state, aliases, match diagnostics, and theme overrides
 - fixture fallback scoring for tests and local API resilience
 - grouped check-suite runner and saved Santa Fe QA reports
 - local MapLibre map tester served at `/map-test`
+- minimal read-only admin viewer served at `/admin`
 - temporary frontend seed and description-enrichment export workflow
 
 The current reference geography is Santa Fe. The implemented public categories are `history`,
@@ -84,8 +85,10 @@ The frontend-facing API is under `/v1`:
 - `POST /v1/point/suggest`: compatibility wrapper around nearby suggestions
 - `GET /v1/poi/{poi_id}`: detail, evidence, themes, provenance, and extended place context
 
-Admin-only endpoints also expose source conflicts, per-field provenance, coverage counts, and match
-logs for curation review.
+Admin-only endpoints expose POI inventory, map features, detail views, source conflicts, per-field
+provenance, coverage counts, match logs, query logs, diagnostics, aliases, and theme-review
+workflows for curation review. Mutating review actions are API-backed; the browser admin viewer is
+currently read-only.
 
 The backend does not compute turn-by-turn route geometry. For route suggestions it estimates
 detour cost geometrically from the supplied route and POI anchor. A frontend or routing provider
@@ -104,7 +107,13 @@ make lint
 make typecheck
 make ingest-osm
 make enrich
-python3 scripts/run_check_suite.py --suite core-product
+.venv/bin/poi-curator-ingest nrhp --region santa-fe
+.venv/bin/poi-curator-ingest gnis --region santa-fe
+.venv/bin/poi-curator-ingest sf-historic-districts --region santa-fe
+.venv/bin/poi-curator-enrich city-gis --region santa-fe
+.venv/bin/poi-curator-enrich nrhp --region santa-fe
+.venv/bin/poi-curator-enrich state-register --region santa-fe
+.venv/bin/python scripts/run_check_suite.py --suite core-product
 ```
 
 Commands that hit the database require PostGIS on `localhost:5432` unless `POI_CURATOR_DATABASE_URL`
@@ -115,9 +124,9 @@ points elsewhere.
 For grouped review output, use the Python suite runner on top of `poi-curator-check`:
 
 ```bash
-python3 scripts/run_check_suite.py --list-suites
-python3 scripts/run_check_suite.py --suite rail-smoke
-python3 scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails --split-cases
+.venv/bin/python scripts/run_check_suite.py --list-suites
+.venv/bin/python scripts/run_check_suite.py --suite rail-smoke
+.venv/bin/python scripts/run_check_suite.py --suite core-product --suite empty-result-guardrails --split-cases
 ```
 
 It writes timestamped grouped outputs under `reports/check_runs/<timestamp>/`:
@@ -127,23 +136,16 @@ It writes timestamped grouped outputs under `reports/check_runs/<timestamp>/`:
 - an `index.md` summary across the suite run
 - optional per-case JSON and Markdown files with `--split-cases`
 
-The latest saved full Santa Fe validation report in this repo is:
-
-```text
-reports/check_runs/20260430T_post_remediation_baseline/index.md
-```
-
-It records 28 passing case runs across `core-product`, `all-fixtures`,
-`empty-result-guardrails`, and `rail-smoke`.
-
-The latest saved full Santa Fe validation report after the GNIS/NMOSE source sprint is:
+The latest committed full Santa Fe validation report after the GNIS/NMOSE source sprint is:
 
 ```text
 reports/check_runs/20260502T_gnis_nmose_baseline/index.md
 ```
 
-It also records 28 passing case runs across the same suite set, with source-corpus drift
-documented in `REVIEW.md`.
+It records 28 passing case runs across `core-product`, `all-fixtures`,
+`empty-result-guardrails`, and `rail-smoke`, with source-corpus drift documented in `REVIEW.md`.
+Saved reports are artifacts, not proof of the current working tree; rerun the suite locally before
+claiming a branch is clean.
 
 ## Repository Layout
 
@@ -170,7 +172,7 @@ Notable entry points:
 - `packages/domain/poi_curator_domain/db.py`: SQLAlchemy/PostGIS ORM model
 - `packages/ingestion/poi_curator_ingestion/pipeline.py`: OSM ingest/canonicalization
 - `packages/ingestion/poi_curator_ingestion/matching.py`: source-to-canonical matching
-- `packages/ingestion/poi_curator_ingestion/sources`: NRHP and City GIS source adapters
+- `packages/ingestion/poi_curator_ingestion/sources`: NRHP, GNIS, NMOSE, and City GIS source adapters
 - `packages/enrichment/poi_curator_enrichment/pipeline.py`: enrichment and evidence rollup
 - `packages/scoring/poi_curator_scoring/query_service.py`: DB-backed query service
 - `packages/scoring/poi_curator_scoring/backend.py`: hybrid DB/fixture scoring backend
@@ -184,6 +186,24 @@ The repository now includes a minimal local testing interface at `/map-test` for
 - manual or sample route suggestion testing
 - category and active theme filters (`water`, `rail`)
 - score, explanation, badge, and POI detail inspection on a map
+
+## Admin Viewer
+
+The repository includes a minimal no-build admin viewer at `/admin` for curation review:
+
+- POI list filtering by category, review state, source, theme, diagnostics, editorial overrides,
+  active-only state, and free text
+- POI detail inspection with canonical fields, editorial badges, aliases, evidence, themes, match
+  diagnostics, external links, and a small map
+- map browsing through `GET /v1/admin/pois/map`
+- query-log browsing when `POI_CURATOR_QUERY_LOGGING=true`
+- health/config inspection, including the current scoring source
+
+Set `POI_CURATOR_ADMIN_KEY` and provide it in the viewer settings. The UI stores the key in
+`localStorage` and sends it as `X-POI-Curator-Admin-Key`.
+
+The viewer is intentionally read-only for now. Editorial mutation, alias creation, diagnostic
+resolution, theme review, and ingest actions remain API/editorial-service workflows.
 
 ## Frontend Seed and Description Workflow
 
@@ -203,10 +223,12 @@ historical/cultural facts.
 ## Current Gaps
 
 - True network detour calculation is still outside this backend.
-- Admin viewer coverage is intentionally pragmatic; conflict, provenance, coverage, and match-log
-  views are available, while deeper resolution workflows remain API/editorial-service work.
+- Admin viewer coverage is intentionally pragmatic and read-only; deeper resolution workflows remain
+  API/editorial-service work.
+- Admin ingest trigger/status endpoints are scaffold responses, not real job orchestration.
+- Wikipedia extract hydration is still a placeholder.
+- Santa Fe is the only actively modeled reference region.
 - Local check suites require a running PostGIS database.
-- Lint/typecheck still need broader cleanup around formatting and theme `Literal` typing.
 - The temporary description-enrichment scripts/reports are generated handoff artifacts.
 
 ## Governance Docs
