@@ -124,6 +124,41 @@ separate from canonical POIs; canonical fields carry per-field provenance.
   private records, local knowledge, unpublished names, or steward-collected maps without explicit
   permission.
 
+## New Mexico Department of Cultural Affairs Museums and Historic Sites
+
+- Source id: `nm_dca`
+- Primary list URL: `https://www.dca.nm.gov/visit/culturepass`
+- Department context URL: `https://www.dca.nm.gov/about`
+- Supporting institution URLs:
+  `https://www.nmhistorymuseum.org/`,
+  `https://www.nmhistorymuseum.org/about/campus/the-palace-of-the-governors.html`,
+  `https://www.nmartmuseum.org/`,
+  `https://www.nmartmuseum.org/about-us/contact/`,
+  `https://www.internationalfolkart.org/about/contact-us.html`, and
+  `https://www.indianartsandculture.org/contact-us/`
+- Chosen format: manually maintained Santa Fe bootstrap list in the adapter. Source discovery on
+  2026-05-11 found public DCA pages listing the state museum and historic-site family, but no
+  coordinate-bearing CSV, ArcGIS layer, or API for the institution network. The bootstrap list
+  records stable public institution names, source URLs, street addresses, and manually maintained
+  point coordinates for matching.
+- License/access notes: public DCA and division-site pages; verify downstream redistribution before
+  publishing raw rows.
+- Refresh cadence: annual manual refresh, or sooner when DCA changes institutional pages.
+- Current scope: Santa Fe DCA-operated visitor-facing institutions from the statewide DCA museum
+  and historic-site network. Out-of-region DCA museums and historic sites are not promoted in this
+  Santa Fe-first adapter pass.
+- Canonical-vs-evidence policy: visitor-facing `state_museum`, `museum_campus`, and
+  `historic_site` records may create canonical POIs when unmatched. Administrative divisions and
+  programs are evidence-only and are not included in the current bootstrap set. The expected Santa
+  Fe behavior is evidence attachment to existing OSM canonicals, with new canonical creation only
+  for a missing DCA campus-level institution.
+- Canonical fields contributed: `name`, `primary_category`, `coordinates`, `short_description` for
+  DCA-created canonical POIs.
+- Evidence contributed: `dca_institution_membership`.
+- Match strategy: existing shared matcher only; a 100 m spatial window plus normalized name
+  similarity at threshold 0.85. DCA does not currently provide Wikidata identifiers in the
+  bootstrap source.
+
 ## Wikidata
 
 - Source id: `wikidata`
