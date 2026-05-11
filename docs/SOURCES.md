@@ -61,6 +61,49 @@ separate from canonical POIs; canonical fields carry per-field provenance.
 - Match strategy: polygon containment/intersection against canonical POI centroids. District
   polygons do not become canonical POIs in this phase.
 
+## New Mexico Historic Preservation Division State Register
+
+- Source id: `nm_hpd`
+- Discovery page: `https://www.nmhistoricpreservation.org/programs/registers.html`
+- Workbook URL:
+  `https://www.nmhistoricpreservation.org/assets/files/registers/2026/SR%20NR%20Excel%20Database.xlsx`
+- Chosen format: HPD "State and National Register Spreadsheet" Excel workbook (`.xlsx`).
+- Acquisition date: 2026-05-11
+- License/access notes: public HPD/DCA register workbook; verify downstream redistribution before
+  publishing raw rows.
+- Refresh cadence: manual local ingest for now; check the HPD Registers page for annual workbook
+  updates.
+- Current scope: State Register rows filtered to Santa Fe County. The 2026 workbook is not
+  coordinate-bearing, so this run uses conservative name/address matching only and does not create
+  new canonical POIs from unlocated records.
+- Canonical-vs-evidence policy: State Register listed properties may create canonical POIs only
+  when an unmatched record carries source coordinates. District designations are evidence-only and
+  do not create canonical POIs automatically. Because the current public workbook has no public
+  geometry, unmatched rows are retained as review diagnostics rather than geocoded or invented.
+- Canonical fields contributed: `name`, `primary_category`, `coordinates`, and
+  `short_description` only for future coordinate-bearing HPD-created canonicals. Matched workbook
+  rows contribute sourced alternate field provenance for `name`, `primary_category`, and
+  `short_description`.
+- Evidence contributed: `state_historic_designation` and
+  `state_register_district_designation`.
+- Match strategy: coordinate-bearing rows use the shared multi-source matcher, with Wikidata
+  identifier support if present and the current 100 m spatial/name fallback. No-coordinate rows use
+  conservative name matching against canonical names and aliases at the shared 0.85 name-similarity
+  threshold. Register-order person names are normalized for matching and future display
+  (`Last, First, House` -> `First Last House`), while the original register name remains sourced
+  evidence and provenance.
+
+### NM HPD ingestion history
+
+- Legacy source id: `nm_hpd_register_workbook`
+- Legacy feed URL: the same HPD State and National Register workbook configured by
+  `POI_CURATOR_NM_HPD_REGISTER_WORKBOOK_URL`.
+- Legacy behavior: the older enrichment path attached high-confidence State Register evidence to
+  existing canonicals, but unmatched workbook rows were routed to `official_match_diagnostic` for
+  editorial review. The workbook lacked coordinates, so the legacy path used name-only matching and
+  deliberately avoided creating HPD-only canonical POIs.
+- Legacy audit: `reports/curation_outcomes/20260511_nm_hpd_legacy_audit.md`.
+
 ## USGS Geographic Names Information System
 
 - Source id: `gnis`
