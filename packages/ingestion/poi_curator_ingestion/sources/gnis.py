@@ -55,15 +55,32 @@ GNIS_LICENSE_NOTES = "USGS GNIS public domain geographic names download."
 NEW_MEXICO = "NEW MEXICO"
 SANTA_FE_COUNTY = "SANTA FE"
 
-RELEVANT_FEATURE_CLASSES = frozenset(
-    {
-        "Canal",
-        "Civil",
-        "Crossing",
-        "Military",
-        "Populated Place",
-    }
-)
+GNIS_FEATURE_CLASS_POLICY: dict[str, frozenset[str]] = {
+    # Stop-shaped enough to create a canonical POI when unmatched in Santa Fe County.
+    "canonical_create": frozenset(
+        {
+            "Canal",
+            "Spring",
+            "Summit",
+            "Valley",
+            "Church",
+            "Cemetery",
+            "Park",
+            "Trail",
+            "School",
+        }
+    ),
+    # Useful source evidence, but too broad or underspecified for automatic canonical creation.
+    "evidence_only": frozenset(
+        {
+            "Civil",
+            "Populated Place",
+            "Locale",
+            "Building",
+        }
+    ),
+}
+RELEVANT_FEATURE_CLASSES = frozenset().union(*GNIS_FEATURE_CLASS_POLICY.values())
 
 
 @dataclass(frozen=True)
@@ -323,7 +340,7 @@ def should_create_canonical(record: GNISRecord) -> bool:
     return (
         record.state_name.strip().upper() == NEW_MEXICO
         and record.county_name.strip().upper() == SANTA_FE_COUNTY
-        and is_relevant_feature_class(record)
+        and record.feature_class.strip() in GNIS_FEATURE_CLASS_POLICY["canonical_create"]
         and not record.is_historical
         and record.lon is not None
         and record.lat is not None
@@ -567,10 +584,12 @@ def evidence_payload(record: GNISRecord) -> dict[str, Any]:
 
 
 def category_for_feature_class(feature_class: str) -> tuple[str, str]:
-    if feature_class in {"Canal", "Crossing"}:
+    if feature_class in {"Canal", "Trail"}:
         return "civic", "infrastructure_landmark"
-    if feature_class == "Military":
+    if feature_class in {"Church", "Cemetery", "School", "Building"}:
         return "history", "historic_site"
+    if feature_class in {"Spring", "Summit", "Valley", "Park"}:
+        return "scenic", "landscape"
     return "civic", "civic_space_plaza"
 
 

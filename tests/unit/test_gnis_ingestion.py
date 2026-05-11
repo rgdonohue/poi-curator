@@ -6,6 +6,7 @@ from geoalchemy2.shape import from_shape
 from poi_curator_domain.db import POIEvidence, POIFieldProvenance
 from poi_curator_ingestion.matching import IncomingSourceRecord, match_incoming_record
 from poi_curator_ingestion.sources.gnis import (
+    GNIS_FEATURE_CLASS_POLICY,
     GNISRecord,
     attach_variant_name_evidence,
     parse_gnis_records,
@@ -147,11 +148,29 @@ def test_historical_gnis_feature_does_not_create_canonical() -> None:
     assert should_create_canonical(records[0]) is False
 
 
-def make_record(*, variant_names: tuple[str, ...] = ()) -> GNISRecord:
+def test_gnis_canonical_policy_creates_only_stop_shaped_classes() -> None:
+    for feature_class in GNIS_FEATURE_CLASS_POLICY["canonical_create"]:
+        record = make_record(feature_class=feature_class)
+
+        assert should_create_canonical(record) is True
+
+
+def test_gnis_evidence_only_policy_does_not_create_canonical() -> None:
+    for feature_class in GNIS_FEATURE_CLASS_POLICY["evidence_only"]:
+        record = make_record(feature_class=feature_class)
+
+        assert should_create_canonical(record) is False
+
+
+def make_record(
+    *,
+    variant_names: tuple[str, ...] = (),
+    feature_class: str = "Populated Place",
+) -> GNISRecord:
     return GNISRecord(
         feature_id="100",
         feature_name="Fixture Pueblo",
-        feature_class="Populated Place",
+        feature_class=feature_class,
         state_name="New Mexico",
         county_name="Santa Fe",
         map_name=None,

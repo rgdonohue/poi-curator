@@ -474,16 +474,18 @@ async function loadPoiList() {
 }
 
 function poiListParams() {
+  const reviewState = els.filterReviewState.value;
   return {
     search: els.poiSearch.value.trim(),
     category: els.filterCategory.value,
-    review_state: els.filterReviewState.value,
+    review_state: reviewState,
     source: els.filterSource.value.trim(),
     theme: els.filterTheme.value,
     theme_match: els.filterThemeMatch.value,
     has_diagnostics: els.filterDiagnostics.value,
     has_editorial_overrides: els.filterOverrides.value,
-    active_only: els.filterActiveOnly.value,
+    active_only:
+      reviewState === "gnis_demoted_pending_review" ? "false" : els.filterActiveOnly.value,
     limit: PAGE_SIZE,
     offset: state.poiListOffset,
   };
@@ -975,16 +977,18 @@ async function loadMapPois() {
 }
 
 function mapParams() {
+  const reviewState = els.mapFilterReviewState.value;
   return {
     search: els.mapFilterSearch.value.trim(),
     category: els.mapFilterCategory.value,
-    review_state: els.mapFilterReviewState.value,
+    review_state: reviewState,
     source: els.mapFilterSource.value.trim(),
     theme: els.mapFilterTheme.value,
     theme_match: els.mapFilterThemeMatch.value,
     has_diagnostics: els.mapFilterDiagnostics.value,
     has_editorial_overrides: els.mapFilterOverrides.value,
-    active_only: els.mapFilterActiveOnly.value,
+    active_only:
+      reviewState === "gnis_demoted_pending_review" ? "false" : els.mapFilterActiveOnly.value,
     limit: 2000,
   };
 }

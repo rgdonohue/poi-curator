@@ -884,11 +884,21 @@ def get_admin_conflicts(
 
 
 def get_admin_coverage(db: Session) -> AdminCoverageResponse:
-    rows = db.scalars(select(POIFieldProvenance)).all()
+    active_poi_ids = set(
+        db.scalars(select(POI.poi_id).where(POI.is_active.is_(True))).all()
+    )
+    rows = (
+        db.scalars(
+            select(POIFieldProvenance).where(
+                POIFieldProvenance.poi_id.in_(active_poi_ids)
+            )
+        ).all()
+        if active_poi_ids
+        else []
+    )
     sources_by_poi: dict[str, set[str]] = {}
     for row in rows:
         sources_by_poi.setdefault(row.poi_id, set()).add(row.source_id)
-    total_pois = db.scalar(select(func.count()).select_from(POI)) or 0
     by_source: dict[str, int] = {}
     by_source_pair: dict[str, int] = {}
     single_source_gaps: dict[str, int] = {}
@@ -907,7 +917,7 @@ def get_admin_coverage(db: Session) -> AdminCoverageResponse:
         by_source=dict(sorted(by_source.items())),
         by_source_pair=dict(sorted(by_source_pair.items())),
         single_source_gaps=dict(sorted(single_source_gaps.items())),
-        total_pois=int(total_pois),
+        total_pois=len(active_poi_ids),
     )
 
 
@@ -1330,6 +1340,8 @@ def _build_external_links(poi: POI) -> dict[str, str]:
 
 
 def _status_for_poi(poi: POI) -> str:
+    if poi.review_status == "gnis_demoted_pending_review":
+        return poi.review_status
     if poi.editorial is not None:
         return poi.editorial.editorial_status
     return poi.review_status

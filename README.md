@@ -23,8 +23,9 @@ This is no longer just a scaffold. The repository currently includes:
 - FastAPI public and admin APIs
 - Postgres/PostGIS schema with Alembic migrations
 - OSM/Overpass ingestion and canonicalization pipeline
-- multi-source NRHP, GNIS, NMOSE POD/acequia, and City of Santa Fe source ingestion alongside OSM
-- Wikidata, City GIS, NRHP, and New Mexico HPD enrichment paths
+- multi-source NRHP, NM HPD, NM DCA, GNIS, NMOSE POD/acequia, and City of Santa Fe source
+  ingestion alongside OSM
+- Wikidata and City GIS enrichment paths
 - evidence, alias, diagnostic, field-provenance, match-log, query-log, and theme-membership tables
 - deterministic route and nearby scoring with score breakdowns
 - editorial mutation paths for review state, aliases, match diagnostics, and theme overrides
@@ -136,10 +137,10 @@ It writes timestamped grouped outputs under `reports/check_runs/<timestamp>/`:
 - an `index.md` summary across the suite run
 - optional per-case JSON and Markdown files with `--split-cases`
 
-The latest committed full Santa Fe validation report after the GNIS/NMOSE source sprint is:
+The latest committed full Santa Fe validation report after the HPD/DCA source sprint is:
 
 ```text
-reports/check_runs/20260502T_gnis_nmose_baseline/index.md
+reports/check_runs/20260511T_hpd_dca_baseline/index.md
 ```
 
 It records 28 passing case runs across `core-product`, `all-fixtures`,
@@ -172,7 +173,7 @@ Notable entry points:
 - `packages/domain/poi_curator_domain/db.py`: SQLAlchemy/PostGIS ORM model
 - `packages/ingestion/poi_curator_ingestion/pipeline.py`: OSM ingest/canonicalization
 - `packages/ingestion/poi_curator_ingestion/matching.py`: source-to-canonical matching
-- `packages/ingestion/poi_curator_ingestion/sources`: NRHP, GNIS, NMOSE, and City GIS source adapters
+- `packages/ingestion/poi_curator_ingestion/sources`: NRHP, NM HPD, NM DCA, GNIS, NMOSE, and City GIS source adapters
 - `packages/enrichment/poi_curator_enrichment/pipeline.py`: enrichment and evidence rollup
 - `packages/scoring/poi_curator_scoring/query_service.py`: DB-backed query service
 - `packages/scoring/poi_curator_scoring/backend.py`: hybrid DB/fixture scoring backend

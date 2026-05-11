@@ -417,6 +417,43 @@ def test_admin_poi_list_pagination_and_inactive_audit(
     assert stale_items[0]["stale_since"] is not None
 
 
+def test_admin_poi_list_surfaces_gnis_demoted_review_queue(
+    admin_poi_fixture: dict[str, Any],
+) -> None:
+    poi_id = admin_poi_fixture["poi_ids"][3]
+    session_factory = get_session_factory()
+    with session_factory() as session:
+        poi = session.get(POI, poi_id)
+        assert poi is not None
+        poi.primary_source = "gnis"
+        poi.review_status = "gnis_demoted_pending_review"
+        session.add(
+            POIEditorial(
+                poi_id=poi_id,
+                editorial_status="needs_review",
+                editorial_title_override=None,
+                editorial_description_override=None,
+                editorial_category_override=None,
+                editorial_boost=0,
+                editorial_notes=None,
+                city_pack=None,
+                last_reviewed_at=None,
+                reviewed_by=None,
+            )
+        )
+        session.commit()
+
+    response = client.get(
+        "/v1/admin/pois?review_state=gnis_demoted_pending_review"
+        "&search=Admin%20Stale&active_only=false&limit=10&offset=0"
+    )
+
+    assert response.status_code == 200
+    items = response.json()["items"]
+    assert [item["poi_id"] for item in items] == [poi_id]
+    assert items[0]["review_state"] == "gnis_demoted_pending_review"
+
+
 def test_admin_poi_detail_adds_admin_only_fields(
     admin_poi_fixture: dict[str, Any],
 ) -> None:

@@ -127,10 +127,13 @@ separate from canonical POIs; canonical fields carry per-field provenance.
 - Current scope: New Mexico rows filtered to Santa Fe County for canonical creation. Other New
   Mexico counties are retained only when they attach as evidence to an existing cross-county
   canonical POI.
-- Relevance filter: canonical candidates are limited to `Canal`, `Civil`, `Crossing`, `Military`,
-  and `Populated Place`. This intentionally excludes broad natural-feature classes, generic
-  reservoir/tank records, and non-POI utility records such as bench marks or coordinate locators
-  where they appear in legacy products.
+- Relevance filter: GNIS canonical creation is limited to feature classes with demonstrable
+  Detour stop-shape value: `Canal`, `Spring`, `Summit`, `Valley`, `Church`, `Cemetery`, `Park`,
+  `Trail`, and `School`. `Civil`, `Populated Place`, `Locale`, and `Building` are evidence-only:
+  they may attach to an existing canonical POI through the shared matcher, but they do not create
+  new canonical POIs automatically. This policy follows the 2026-05-02 GNIS quality spot-check in
+  `reports/curation_outcomes/20260502_gnis_quality_spotcheck.md`, which found broad civil and
+  populated-place records valuable as curation leads but too uneven for automatic Detour surfacing.
 - Canonical fields contributed: `name`, `primary_category`, `coordinates`, `short_description`
 - Evidence contributed: `geographic_name`, `variant_name`, and `historical_feature`
 - Match strategy: existing shared matcher only; Wikidata identifier first when available, then a

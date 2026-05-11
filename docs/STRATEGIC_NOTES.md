@@ -40,3 +40,36 @@ This sprint confirms that official-name and infrastructure agencies are useful s
 - For water-theme coverage: NMOSE evidence strengthens the acequia/water layer without requiring private steward records; future enrichment should preserve the public/private boundary explicitly.
 - For conflict policy: GNIS variant names are expected conflicts and should be treated as alternates unless editorial review promotes one to canonical display.
 - For operations: parallel source sprints work, but shared live database writes make before/after counts harder to interpret; future sub-agent sprints should isolate operational DB runs or coordinate write windows.
+
+---
+
+## 2026-05-11 — HPD and DCA sprint matures institutional coverage
+
+The NM HPD and NM DCA sprint adds two institutional corroboration layers to the Santa Fe corpus.
+HPD is primarily an evidence and diagnostic layer: the public State Register workbook is not
+coordinate-bearing, so it attached 78 State Register evidence rows and retained 136 current
+no-coordinate diagnostics rather than creating synthetic canonicals. DCA is a small institutional
+network layer: it attached six museum/historic-site membership evidence rows and created one
+missing DCA-primary canonical for `New Mexico Museum of Art - Vladem Contemporary`.
+
+### Why this matters for POI Curator
+
+The source ecology now has seven implemented non-synthetic source families around the OSM spatial
+spine: Wikidata, City GIS/historic districts, NRHP, NM HPD, NM DCA, GNIS, and NMOSE. This confirms
+the layered model: official register and institutional sources mostly strengthen existing
+canonicals through evidence, while only source records with stop-shaped geometry should create new
+canonicals. The remaining gap is not source discovery alone; it is editorial capacity for retained
+diagnostics, demoted broad geographies, and field-level naming conflicts.
+
+### Implications if revisited
+
+- For source maturity: federal/state/city/institutional corroboration is now reasonably represented
+  for central Santa Fe anchors; vernacular, Indigenous/community-authored, and time-depth narrative
+  layers remain thinner.
+- For architecture: canonical-vs-evidence-only policy must remain explicit in every adapter.
+  Institutional recognition is not equivalent to a traveler-facing POI.
+- For editorial planning: backlog pages should drive the next work selection more than new source
+  acquisition; HPD no-coordinate diagnostics and GNIS-demoted records are now the largest queues.
+- For multi-city expansion: this sprint reinforces that structured institutional sources vary
+  sharply by geography and may need bootstrap lists or retained diagnostics rather than forced
+  canonical creation.

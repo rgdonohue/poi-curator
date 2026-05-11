@@ -315,3 +315,120 @@ Score drift and baseline decision:
   POD canonicals, which is appropriate until those records receive editorial review.
 - Promoted the post-sprint full run to
   `reports/check_runs/20260502T_gnis_nmose_baseline/` and updated `README.md` to point to it.
+
+## Stash Review 20260502
+
+Reviewed `stash@{0}` (`On sprint/gnis: pre-merge nmose and coordination artifacts`) against
+current `main`.
+
+Findings:
+- `packages/ingestion/poi_curator_ingestion/sources/nmose_acequia.py`,
+  `tests/unit/test_nmose_acequia.py`, and
+  `reports/curation_outcomes/20260502_nmose_acequia_run.md` are byte-for-byte identical to files
+  already committed on `main`.
+- `docs/SOURCES.md` contains the pre-merge NMOSE source documentation; current `main` has that
+  content plus the GNIS section from the serial merge, so the stash copy is superseded.
+- `reports/curation_outcomes/20260502_post_sprint_followups.md` is the pre-integration scaffold;
+  current `main` has the completed follow-up report, so the stash copy is superseded.
+- `reports/check_runs/20260502T144047Z/` and `reports/check_runs/20260502T144229Z/` are
+  intermediate sub-agent/core-product check outputs. They are superseded by committed post-merge
+  verification outputs, including `reports/check_runs/20260502T144735Z/`,
+  `reports/check_runs/20260502T144858Z/`, and the promoted
+  `reports/check_runs/20260502T_gnis_nmose_baseline/`.
+
+No genuinely lost work was found in the stash. It is safe to drop after the required local-delete
+confirmation.
+
+## GNIS Policy Refinement Verification — 2026-05-02
+
+Policy change:
+- GNIS canonical creation is now limited to stop-shaped classes: Canal, Spring, Summit, Valley,
+  Church, Cemetery, Park, Trail, and School.
+- Civil, Populated Place, Locale, and Building are evidence-only classes. Broad GNIS-primary
+  canonicals from the previous run were demoted to curator review instead of deleted.
+
+Database curation outcomes:
+- Demoted 104 active GNIS-primary canonicals: 41 Civil, 62 Populated Place, and 1 Military.
+- 6 demoted records found a nearby non-GNIS canonical within 150m and had GNIS evidence attached;
+  98 had no nearby canonical and were queued as `gnis_demoted_pending_review`.
+- Re-ran the GNIS adapter against the source feed. It created 160 newly eligible stop-shaped
+  canonicals: 74 Valley, 58 Summit, and 28 Spring. Active GNIS-primary canonicals now total 173,
+  all in allowed canonical classes.
+- No active Civil, Populated Place, Locale, Building, or Military GNIS-primary canonicals remain.
+
+Verification:
+- `.venv/bin/python -m pytest` - 177 passed.
+- `.venv/bin/ruff check .` - passed.
+- `.venv/bin/mypy apps packages tests` - passed with no issues in 89 source files.
+- Full saved check-suite run:
+  `.venv/bin/python scripts/run_check_suite.py --suite core-product --suite all-fixtures --suite empty-result-guardrails --suite rail-smoke`
+  - 28 passed, 0 failed. Output directory: `reports/check_runs/20260502T154929Z/`.
+- Admin viewer smoke check: POI List with `review_state='gnis_demoted_pending_review'` showed
+  the demoted GNIS review queue, and Coverage showed active-canonical coverage
+  (`total_pois=742`, `by_source.gnis=185`, `single_source_gaps.gnis=173`).
+
+Score drift and baseline decision:
+- Compared with `reports/check_runs/20260502T_gnis_nmose_baseline/`, saved check-suite top
+  results and rounded scores were unchanged.
+- No baseline promotion is needed for this refinement.
+
+Sanity check append - 2026-05-11:
+- Pre-refinement active GNIS-primary canonicals were 117 total: 62 `Populated Place`, 41 `Civil`,
+  13 `Canal`, and 1 `Military`. Of these, only the 13 `Canal` records are in the refined
+  canonical-eligible class list.
+- The pre-refinement adapter filter in `HEAD` was narrower and only admitted `Canal`, `Civil`,
+  `Crossing`, `Military`, and `Populated Place`; it did not admit `Spring`, `Summit`, or `Valley`.
+  The 160 new active GNIS-primary canonicals from the rerun are therefore net-new eligible
+  records, not duplicate recreation of prior GNIS canonicals.
+- Source-file counts for the newly admitted classes in Santa Fe County were 29 `Spring`,
+  62 `Summit`, and 74 `Valley` records. The active new set is 28 `Spring`, 58 `Summit`, and
+  74 `Valley`: `Spring 8`, `Cerro Gordo`, `Sun Mountain`, and `Tano Point` matched existing
+  canonicals, while `Atalaya Mountain` was logged as ambiguous with two candidates.
+- The 13 existing `Canal` canonicals were matched on rerun and not duplicated.
+- No `Church`, `Cemetery`, `Park`, `Trail`, or `School` Santa Fe County records exist in the
+  downloaded GNIS New Mexico source file used by the adapter. Their absence from the active set is
+  source-data absence, not filtering loss or missed attachment.
+
+## NM HPD / NM DCA Source Sprint Verification — 2026-05-11
+
+Changes merged:
+- `sprint/nm-hpd` (`550c787`): added NM HPD State Register ingestion, CLI command, unit tests,
+  source documentation, `reports/curation_outcomes/20260511_nm_hpd_legacy_audit.md`, and
+  `reports/curation_outcomes/20260511_nm_hpd_run.md`.
+- `sprint/nm-dca` (`5c611f4`): added NM DCA institution ingestion, unit tests, source
+  documentation, and `reports/curation_outcomes/20260511_nm_dca_run.md`.
+- Main-agent docs: updated source ecology, strategic notes, naming policy, README status,
+  `docs/EDITORIAL_BACKLOG.md`, and
+  `reports/curation_outcomes/20260511_post_sprint_followups.md`.
+
+Database curation outcomes:
+- Active canonical POIs after the sprint: 743.
+- NM HPD created no canonicals because the current public State Register workbook has no
+  coordinates. It attached 78 State Register evidence rows and retained 136 current no-coordinate
+  diagnostics.
+- NM HPD legacy reconciliation marked 17 legacy diagnostics superseded, 73 retained unreviewed,
+  and 1 out of scope.
+- NM DCA attached 6 institutional membership evidence rows and created 1 DCA-primary canonical:
+  `New Mexico Museum of Art - Vladem Contemporary`.
+- Admin Coverage shows `nm_hpd=78` and `nm_dca=6` in source coverage, with active total 743.
+
+Verification:
+- HPD post-merge gate: `.venv/bin/python -m pytest` - 179 passed; core check suite - 6 passed at
+  `reports/check_runs/20260511T104850Z/`.
+- Final combined `.venv/bin/python -m pytest` - 188 passed.
+- `.venv/bin/ruff check .` - passed.
+- `.venv/bin/mypy apps packages tests` - passed with no issues in 93 source files.
+- Full saved check-suite run:
+  `.venv/bin/python scripts/run_check_suite.py --suite core-product --suite all-fixtures --suite empty-result-guardrails --suite rail-smoke`
+  - 28 passed, 0 failed. Output directory: `reports/check_runs/20260511T105213Z/`.
+- Admin viewer smoke check: Coverage tab showed `nm_hpd` and `nm_dca` source counts.
+
+Score drift and baseline decision:
+- Compared with `reports/check_runs/20260502T_gnis_nmose_baseline/`, two history/plaza cases
+  drifted as expected from HPD/DCA institutional evidence. Palace of the Governors rose from 77.4
+  to 81.0 in `nearby-plaza-history`, New Mexico History Museum entered the top five, and Palace of
+  the Governors entered the `route-historic-center-driving` top five.
+- Expected anchors still pass. The drift is legitimate institutional corroboration, not a matcher
+  regression.
+- Promoted `reports/check_runs/20260511T105213Z/` to
+  `reports/check_runs/20260511T_hpd_dca_baseline/` and updated `README.md` to point to it.

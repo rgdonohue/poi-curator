@@ -17,22 +17,28 @@ The system should not treat every source as equally true. Some sources define ge
 
 ## Current State
 
-As of April 3, 2026:
+As of May 11, 2026:
 
 - live OSM ingestion is working for Santa Fe
-- canonical POIs are persisted in PostGIS
+- canonical POIs are persisted in PostGIS with per-field provenance and match logs
 - route and point suggestion endpoints score DB-backed POIs
 - Wikidata enrichment is working for OSM records that already carry explicit `wikidata=*` tags
+- NRHP, NM HPD, NM DCA, GNIS, NMOSE POD/acequia, and City historic-district sources are implemented
 - score diagnostics, category-intent handling, and route evaluation harnesses exist
 
-This is enough to demonstrate the product idea, but not enough to guarantee that culturally central anchors surface consistently or that interpretive texture is rich enough.
+This is enough to demonstrate the product idea and to ground central Santa Fe anchors in multiple
+source layers, but not enough to eliminate editorial review needs. The main remaining weakness is
+curation capacity: broad official records and no-coordinate register rows must be reviewed before
+they become traveler-facing stops.
 
 Current weakness:
 
-- anchor reliability still depends too heavily on OSM coverage and current weighting
-- official city/state/federal corroboration is not yet modeled as first-class evidence
+- anchor reliability still depends partly on OSM coverage and current weighting
+- official city/state/federal corroboration is now modeled as evidence, but not all source records
+  are canonical-worthy
 - interpretive themes exist implicitly in category logic, not explicitly as reusable overlays
-- crawler-like discovery is not yet separated from truth-bearing evidence
+- crawler-like discovery is now separated from truth-bearing evidence for implemented official
+  sources, but editorial queues remain large
 
 ## Strategic Model
 
@@ -174,6 +180,15 @@ Any place with strong official corroboration but weak runtime surfacing should b
 
 That lets the team decide whether the model is wrong, the category mapping is wrong, or the source record is incomplete.
 
+#### E. Separate canonical creation from evidence attachment
+
+The GNIS refinement and HPD/DCA runs made this a standing implementation principle: a source
+adapter must decide which record types are stop-shaped enough to create canonical POIs and which
+record types should attach only as evidence. Broad geographies, districts, administrative programs,
+and no-coordinate register rows remain discoverable as evidence or diagnostics, but they should not
+automatically surface in Detour scoring. This preserves source value without letting official data
+volume masquerade as curated POI quality.
+
 ## Source Strategy
 
 ### Tier A: ingest and link as structured evidence
@@ -212,6 +227,8 @@ Current verified reference:
 
 - [NPS National Register data downloads](https://www.nps.gov/subjects/nationalregister/data-downloads.htm)
 
+Status: implemented as `nrhp`.
+
 #### New Mexico Historic Preservation Division / State Register
 
 Use for:
@@ -223,6 +240,9 @@ Use for:
 Current verified reference:
 
 - [NM Historic Preservation Division: Registers of Cultural Properties](https://www.nmhistoricpreservation.org/programs/registers.html)
+
+Status: implemented as `nm_hpd`. The current public workbook is not coordinate-bearing, so HPD is
+primarily a State Register evidence layer plus retained diagnostics for unmatched records.
 
 #### New Mexico Department of Cultural Affairs
 
@@ -236,6 +256,9 @@ Use for:
 Current verified reference:
 
 - [New Mexico Department of Cultural Affairs](https://www.newmexicoculture.org/)
+
+Status: implemented as `nm_dca`. It currently operates mainly as institutional corroboration for
+existing OSM canonicals, with rare DCA-primary canonical creation for missing campus-level records.
 
 ### Tier B: ingest as evidence or editorial lead material
 

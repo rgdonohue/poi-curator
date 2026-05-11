@@ -25,6 +25,12 @@ Canonical names are display labels for Detour. They should be readable to a trav
 7. OSE acequia and POD labels are provisional source labels.
    Public OSE labels for points of diversion and conveyances should be preserved as source evidence. All-caps names, shorthand labels, and `Point of Diversion - X` names are acceptable for unreviewed canonicals, but reviewed display names should normalize capitalization and avoid adding unpublished steward/local names without explicit permission.
 
+8. HPD State Register names follow the same register-name rule as NRHP.
+   HPD workbook names such as `Read, Benjamin M., House` or `Bergere, A. M., House` should remain sourced alternates when OSM, NRHP, or editorial review provides the common display form. HPD suffixes such as `NHL` or register/district qualifiers are provenance cues, not automatic display text, unless the qualifier is needed to distinguish two records.
+
+9. DCA institutional names preserve public-facing museum/site branding.
+   DCA source labels should corroborate institution identity, but they should not override a clearer common campus name already used by OSM or editorial review. Parent institution names and campus/site names can both be preserved as alternates; the canonical display should be the visitor-facing name for the specific place.
+
 ## Admin Display
 
-The admin viewer should show the canonical value as the highlighted value for each field and list all alternate sourced values below it. Name conflicts caused only by register order, accents, articles, or parenthetical normalization are still conflicts, but they should be treated as resolved normalization cases once exactly one provenance row is marked canonical.
+The admin viewer should show the canonical value as the highlighted value for each field and list all alternate sourced values below it. Name conflicts caused only by register order, accents, articles, parenthetical normalization, HPD register qualifiers, or DCA parent/campus naming should still be visible, but they can be treated as resolved normalization cases once exactly one provenance row is marked canonical.
