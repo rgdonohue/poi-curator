@@ -173,7 +173,7 @@ def build_clusters(rows: list[Row]) -> ClusterResult:
             best_cluster.reasons.add("node_proximity")
         elif best_review is not None:
             cluster, distance, shared = best_review
-            survivor = _select_survivor(cluster.rows)
+            survivor = select_survivor(cluster.rows)
             review_candidates.append(
                 ReviewCandidate(
                     cluster_survivor_poi_id=survivor["poi_id"],
@@ -191,5 +191,57 @@ def build_clusters(rows: list[Row]) -> ClusterResult:
     return ClusterResult(clusters=clusters, review_candidates=review_candidates)
 
 
-def _select_survivor(rows: list[Row]) -> Row:  # replaced in Task 3
-    return max(rows, key=_quality)
+_TYPE_RANK = {"relation": 0, "way": 1, "node": 2}
+
+# Identity-evidence weights scanned across provenance columns for display-name choice.
+_IDENTITY_SIGNALS: tuple[tuple[str, int], ...] = (
+    ("state_register", 3),
+    ("nrhp", 3),
+    ("historic", 1),
+)
+_PROVENANCE_COLUMNS = ("claim_basis", "source_basis", "evidence_sources", "description_basis_v1")
+
+
+def _osm_type(row: Row) -> str:
+    key = row["dedupe_key"]
+    if key.startswith("osm:") and "/" in key:
+        return key[len("osm:") :].split("/", 1)[0]
+    return "zzz"  # non-OSM sorts last on the type tie-break
+
+
+def select_survivor(rows: list[Row]) -> Row:
+    return min(
+        rows,
+        key=lambda row: (
+            -_quality(row),
+            _TYPE_RANK.get(_osm_type(row), 9),
+            row["poi_id"],
+        ),
+    )
+
+
+def _identity_score(row: Row) -> int:
+    haystack = " ".join(row.get(column, "") for column in _PROVENANCE_COLUMNS).casefold()
+    return sum(weight for token, weight in _IDENTITY_SIGNALS if token in haystack)
+
+
+def choose_display_name(rows: list[Row]) -> tuple[str, list[str]]:
+    """Return (display_name, aliases). Aliases preserve every other cluster name."""
+    chosen_row = min(
+        rows,
+        key=lambda row: (
+            -_identity_score(row),
+            -len(significant_tokens(row["name"])),
+            -len(row["name"]),
+            row["poi_id"],
+        ),
+    )
+    chosen = chosen_row["name"]
+    aliases: list[str] = []
+    seen = {chosen}
+    for row in rows:
+        name = row["name"].strip()
+        if name and name not in seen:
+            seen.add(name)
+            aliases.append(name)
+    return chosen, aliases

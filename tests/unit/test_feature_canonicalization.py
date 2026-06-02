@@ -1,6 +1,8 @@
 from poi_curator_editorial.feature_canonicalization import (
     build_clusters,
+    choose_display_name,
     haversine_m,
+    select_survivor,
     significant_tokens,
 )
 
@@ -153,3 +155,37 @@ def test_two_generic_house_rows_within_35m_do_not_merge() -> None:
     ]
     result = build_clusters(rows)
     assert all(len(c.rows) == 1 for c in result.clusters)
+
+
+def test_survivor_is_highest_quality_relation() -> None:
+    survivor = select_survivor(_tudesque_rows())
+    assert survivor["dedupe_key"] == "osm:relation/13422888"  # q=80
+
+
+def test_survivor_tie_break_relation_over_way() -> None:
+    rows = [
+        _row(poi_id="w", dedupe_key="osm:way/1", name="W", quality_score="70"),
+        _row(poi_id="r", dedupe_key="osm:relation/1", name="R", quality_score="70"),
+    ]
+    assert select_survivor(rows)["dedupe_key"] == "osm:relation/1"
+
+
+def test_survivor_tie_break_lowest_poi_id_when_same_type() -> None:
+    rows = [
+        _row(poi_id="zzz", dedupe_key="osm:node/2", name="Z", quality_score="70"),
+        _row(poi_id="aaa", dedupe_key="osm:node/1", name="A", quality_score="70"),
+    ]
+    assert select_survivor(rows)["poi_id"] == "aaa"
+
+
+def test_display_name_prefers_state_register_over_relation_label() -> None:
+    rows = [
+        _row(poi_id="p-rel", dedupe_key="osm:relation/13422888", name="Tudesque House",
+             quality_score="80", claim_basis="historic_district|wikidata_id"),
+        _row(poi_id="p-node", dedupe_key="osm:node/6479254097", name="Roque Tudesque House",
+             quality_score="62.5", claim_basis="state_register|historic_district"),
+    ]
+    chosen, aliases = choose_display_name(rows)
+    assert chosen == "Roque Tudesque House"
+    assert "Tudesque House" in aliases
+    assert "Roque Tudesque House" not in aliases
