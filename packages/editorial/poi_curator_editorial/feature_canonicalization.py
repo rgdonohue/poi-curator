@@ -27,6 +27,11 @@ STRUCTURAL_TOKENS: frozenset[str] = frozenset(
         "centre",
         "complex",
         "compound",
+        # Plural residues from normalize_name_tokens (strips trailing "s",
+        # does not handle y->ies): gallery/annex/complex.
+        "gallerie",
+        "annexe",
+        "complexe",
     }
 )
 DIRECTIONAL_TOKENS: frozenset[str] = frozenset(

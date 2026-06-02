@@ -22,3 +22,11 @@ def test_significant_tokens_drops_structural_and_directional() -> None:
 
 def test_significant_tokens_two_generic_house_names_do_not_share() -> None:
     assert not (significant_tokens("Adobe House") & significant_tokens("Stone House"))
+
+
+def test_haversine_identical_points_is_zero() -> None:
+    assert haversine_m(-105.9, 35.6, -105.9, 35.6) == 0.0
+
+
+def test_significant_tokens_empty_name_is_empty_set() -> None:
+    assert significant_tokens("") == set()
