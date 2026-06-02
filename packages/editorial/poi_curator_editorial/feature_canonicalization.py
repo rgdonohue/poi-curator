@@ -320,3 +320,62 @@ def merge_cluster(cluster: Cluster) -> tuple[Row, dict[str, Any]]:
         "merge_reason": survivor["merge_reason"],
     }
     return survivor, entry
+
+
+MANIFEST_SCHEMA_VERSION = 1
+
+
+def canonicalize(rows: list[Row]) -> tuple[list[Row], dict[str, Any]]:
+    result = build_clusters(rows)
+    merged_rows: list[Row] = []
+    cluster_entries: list[dict[str, Any]] = []
+    clusters_collapsed = 0
+    clusters_left_colocated = 0
+
+    for cluster in result.clusters:
+        row, entry = merge_cluster(cluster)
+        merged_rows.append(row)
+        if len(cluster.rows) > 1:
+            clusters_collapsed += 1
+            cluster_entries.append(entry)
+
+    # Count multi-row spatial co-locations we intentionally did NOT merge: any two
+    # surviving rows within ABSORB_RADIUS_M of each other.
+    for i, left in enumerate(merged_rows):
+        left_coords = _lonlat(left)
+        if left_coords is None:
+            continue
+        for right in merged_rows[i + 1 :]:
+            right_coords = _lonlat(right)
+            if right_coords is None:
+                continue
+            if (
+                haversine_m(left_coords[0], left_coords[1], right_coords[0], right_coords[1])
+                <= ABSORB_RADIUS_M
+            ):
+                clusters_left_colocated += 1
+                break
+
+    manifest: dict[str, Any] = {
+        "schema_version": MANIFEST_SCHEMA_VERSION,
+        "summary": {
+            "rows_before": len(rows),
+            "rows_after": len(merged_rows),
+            "clusters_collapsed": clusters_collapsed,
+            "clusters_left_colocated": clusters_left_colocated,
+            "review_candidates": len(result.review_candidates),
+        },
+        "clusters": cluster_entries,
+        "review_candidates": [
+            {
+                "cluster_survivor_poi_id": rc.cluster_survivor_poi_id,
+                "candidate_poi_id": rc.candidate_poi_id,
+                "candidate_name": rc.candidate_name,
+                "distance_m": rc.distance_m,
+                "shared_tokens": rc.shared_tokens,
+            }
+            for rc in result.review_candidates
+        ],
+        "secondary_flags": [],
+    }
+    return merged_rows, manifest

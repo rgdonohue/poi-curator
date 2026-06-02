@@ -2,6 +2,7 @@ from poi_curator_editorial.feature_canonicalization import (
     Cluster,
     _identity_score,
     build_clusters,
+    canonicalize,
     choose_display_name,
     haversine_m,
     merge_cluster,
@@ -273,3 +274,30 @@ def test_merge_cluster_blank_coord_survivor_does_not_crash() -> None:
     big = next(c for c in build_clusters(rows).clusters if len(c.rows) > 1)
     row, entry = merge_cluster(big)  # must not raise
     assert all(d["distance_m"] is None for d in entry["dropped"])
+
+
+def test_canonicalize_collapses_tudesque_only() -> None:
+    rows = _tudesque_rows() + [
+        _row(poi_id="rpe", dedupe_key="osm:way/473591088", name="Santa Fe River Park East",
+             lon="-105.94965210201538", lat="35.68855565878708", quality_score="77.5"),
+        _row(poi_id="rpw", dedupe_key="osm:node/357605718", name="Santa Fe River Park West",
+             lon="-105.9559119", lat="35.6884733", quality_score="67.5"),
+    ]
+    merged, manifest = canonicalize(rows)
+    assert manifest["schema_version"] == 1
+    assert manifest["summary"]["rows_before"] == 6
+    assert manifest["summary"]["rows_after"] == 3  # 1 Tudesque + 2 river park
+    assert manifest["summary"]["clusters_collapsed"] == 1
+    assert len(manifest["clusters"]) == 1
+    assert all("merged_from" in row and "merge_reason" in row for row in merged)
+
+
+def test_canonicalize_is_idempotent() -> None:
+    rows = _tudesque_rows()
+    merged_once, _ = canonicalize(rows)
+    merged_twice, manifest2 = canonicalize(merged_once)
+    assert len(merged_twice) == len(merged_once)
+    alias_once = next(r["preferred_aliases"] for r in merged_once if r["merged_from"])
+    alias_twice = next(r["preferred_aliases"] for r in merged_twice if r["poi_id"] == "p-rel")
+    assert alias_once == alias_twice  # lists do not grow
+    assert manifest2["summary"]["clusters_collapsed"] == 0  # nothing left to collapse
