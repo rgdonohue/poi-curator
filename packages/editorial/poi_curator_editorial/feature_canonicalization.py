@@ -194,6 +194,11 @@ def build_clusters(rows: list[Row]) -> ClusterResult:
 _TYPE_RANK = {"relation": 0, "way": 1, "node": 2}
 
 # Identity-evidence weights scanned across provenance columns for display-name choice.
+# Matching is substring (not exact-token) ON PURPOSE: embedded provenance tokens like
+# "nrhp_listed_properties" or "nm_hpd_register_workbook" must still be credited.
+# "historic" is a deliberate weak catch-all that STACKS with the specific registers, so a
+# state-registered building that is also in a historic_district scores higher. That
+# stacking is intended behaviour, not a bug.
 _IDENTITY_SIGNALS: tuple[tuple[str, int], ...] = (
     ("state_register", 3),
     ("nrhp", 3),

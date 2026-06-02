@@ -1,4 +1,5 @@
 from poi_curator_editorial.feature_canonicalization import (
+    _identity_score,
     build_clusters,
     choose_display_name,
     haversine_m,
@@ -189,3 +190,20 @@ def test_display_name_prefers_state_register_over_relation_label() -> None:
     assert chosen == "Roque Tudesque House"
     assert "Tudesque House" in aliases
     assert "Roque Tudesque House" not in aliases
+
+
+def test_identity_score_stacks_historic_district_with_state_register() -> None:
+    # Intentional: state_register (3) + historic (from historic_district, 1) = 4.
+    assert _identity_score(_row(claim_basis="state_register|historic_district")) == 4
+    # Bare state_register alone scores 3.
+    assert _identity_score(_row(claim_basis="state_register")) == 3
+
+
+def test_identity_score_credits_embedded_register_tokens() -> None:
+    # Substring matching is intentional: embedded source tokens still count.
+    assert _identity_score(_row(source_basis="osm_overpass|nrhp_listed_properties")) == 3
+    assert _identity_score(_row(source_basis="osm_overpass|nm_hpd_register_workbook")) == 0
+
+
+def test_identity_score_zero_when_no_identity_evidence() -> None:
+    assert _identity_score(_row(claim_basis="wikidata_id", source_basis="osm_overpass")) == 0
