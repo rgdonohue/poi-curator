@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass, field
+from typing import Any
 
 from poi_curator_ingestion.matching import normalize_name_tokens
 
@@ -250,3 +251,68 @@ def choose_display_name(rows: list[Row]) -> tuple[str, list[str]]:
             seen.add(name)
             aliases.append(name)
     return chosen, aliases
+
+
+def _union_pipe(values: list[str]) -> str:
+    seen: set[str] = set()
+    out: list[str] = []
+    for value in values:
+        for item in (part.strip() for part in value.split("|")):
+            if item and item not in seen:
+                seen.add(item)
+                out.append(item)
+    return "|".join(out)
+
+
+def merge_cluster(cluster: Cluster) -> tuple[Row, dict[str, Any]]:
+    """Collapse a cluster to one row plus a manifest entry. Singletons pass through."""
+    survivor = dict(select_survivor(cluster.rows))
+    chosen_name, aliases = choose_display_name(cluster.rows)
+    dropped = [row for row in cluster.rows if row["poi_id"] != survivor["poi_id"]]
+
+    survivor["name"] = chosen_name
+    survivor["preferred_aliases"] = _union_pipe(
+        [survivor.get("preferred_aliases", "")] + aliases
+    )
+    survivor["evidence_sources"] = _union_pipe(
+        [row.get("evidence_sources", "") for row in cluster.rows]
+    )
+    survivor["active_themes"] = _union_pipe(
+        [row.get("active_themes", "") for row in cluster.rows]
+    )
+    if not survivor.get("wikipedia_title", "").strip():
+        for row in sorted(dropped, key=lambda r: -_quality(r)):
+            title = row.get("wikipedia_title", "").strip()
+            if title:
+                survivor["wikipedia_title"] = title
+                break
+
+    # Audit columns. Ignore any pre-existing merged_from/merge_reason (idempotency).
+    survivor["merged_from"] = "|".join(sorted(row["dedupe_key"] for row in dropped))
+    survivor["merge_reason"] = "+".join(sorted(cluster.reasons)) if dropped else ""
+
+    entry: dict[str, Any] = {
+        "survivor_poi_id": survivor["poi_id"],
+        "survivor_dedupe_key": survivor["dedupe_key"],
+        "chosen_display_name": chosen_name,
+        "alias_names": aliases,
+        "dropped": [
+            {
+                "poi_id": row["poi_id"],
+                "dedupe_key": row["dedupe_key"],
+                "name": row["name"],
+                "lon": float(row["lon"]),
+                "lat": float(row["lat"]),
+                "distance_m": round(
+                    haversine_m(
+                        float(row["lon"]), float(row["lat"]),
+                        float(survivor["lon"]), float(survivor["lat"]),
+                    ),
+                    2,
+                ),
+            }
+            for row in dropped
+        ],
+        "merge_reason": survivor["merge_reason"],
+    }
+    return survivor, entry

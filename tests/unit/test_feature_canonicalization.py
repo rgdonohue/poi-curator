@@ -1,8 +1,10 @@
 from poi_curator_editorial.feature_canonicalization import (
+    Cluster,
     _identity_score,
     build_clusters,
     choose_display_name,
     haversine_m,
+    merge_cluster,
     select_survivor,
     significant_tokens,
 )
@@ -56,7 +58,8 @@ def _tudesque_rows() -> list[dict[str, str]]:
                  lon="-105.93903457267577", lat="35.6841571533804", quality_score="67.5",
                  parent_relation_id="osm:relation/13422888")
     node = _row(poi_id="p-node", dedupe_key="osm:node/6479254097", name="Roque Tudesque House",
-                lon="-105.938944", lat="35.6841299", quality_score="62.5")
+                lon="-105.938944", lat="35.6841299", quality_score="62.5",
+                claim_basis="state_register|historic_district")
     return [rel, way_e, way_w, node]
 
 
@@ -207,3 +210,39 @@ def test_identity_score_credits_embedded_register_tokens() -> None:
 
 def test_identity_score_zero_when_no_identity_evidence() -> None:
     assert _identity_score(_row(claim_basis="wikidata_id", source_basis="osm_overpass")) == 0
+
+
+def test_merge_cluster_produces_single_audited_row() -> None:
+    clusters = build_clusters(_tudesque_rows()).clusters
+    big = next(c for c in clusters if len(c.rows) > 1)
+    row, entry = merge_cluster(big)
+    assert row["poi_id"] == "p-rel"
+    assert row["name"] == "Roque Tudesque House"  # state_register node name wins
+    assert set(row["merged_from"].split("|")) == {
+        "osm:way/461729208", "osm:way/461729209", "osm:node/6479254097",
+    }
+    assert "osm_relation_members" in row["merge_reason"]
+    assert "node_proximity" in row["merge_reason"]
+    assert "Tudesque House" in row["preferred_aliases"]
+    assert entry["survivor_poi_id"] == "p-rel"
+    assert entry["chosen_display_name"] == "Roque Tudesque House"
+
+
+def test_merge_cluster_unions_evidence_sources() -> None:
+    rows = _tudesque_rows()
+    rows[0]["evidence_sources"] = "city_gis_historic_districts|wikidata_id"
+    rows[3]["evidence_sources"] = "nm_hpd_register_workbook|city_gis_historic_districts"
+    big = next(c for c in build_clusters(rows).clusters if len(c.rows) > 1)
+    row, _ = merge_cluster(big)
+    sources = row["evidence_sources"].split("|")
+    assert sorted(sources) == sorted(set(sources))  # no dupes
+    assert "nm_hpd_register_workbook" in sources
+    assert "wikidata_id" in sources
+
+
+def test_merge_is_idempotent_on_already_merged_row() -> None:
+    big = next(c for c in build_clusters(_tudesque_rows()).clusters if len(c.rows) > 1)
+    merged_once, _ = merge_cluster(big)
+    again, _ = merge_cluster(Cluster(rows=[dict(merged_once)], reasons=set()))
+    assert again["preferred_aliases"] == merged_once["preferred_aliases"]
+    assert again["merged_from"] == ""  # singleton: nothing collapsed
