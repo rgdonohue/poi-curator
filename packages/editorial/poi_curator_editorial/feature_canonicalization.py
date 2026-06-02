@@ -8,6 +8,7 @@ preserving legitimately co-located distinct features.
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass, field
 
 from poi_curator_ingestion.matching import normalize_name_tokens
 
@@ -55,3 +56,123 @@ def haversine_m(lon1: float, lat1: float, lon2: float, lat2: float) -> float:
     d_lambda = math.radians(lon2 - lon1)
     a = math.sin(d_phi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(d_lambda / 2) ** 2
     return 2 * _EARTH_RADIUS_M * math.asin(math.sqrt(a))
+
+
+Row = dict[str, str]
+
+# Auto-merge a non-member row into a lineage cluster only within this radius.
+ABSORB_RADIUS_M = 35.0
+# Same-token non-members in this outer band are flagged for review, never merged.
+REVIEW_RADIUS_M = 75.0
+
+
+@dataclass
+class Cluster:
+    rows: list[Row]
+    reasons: set[str] = field(default_factory=set)
+
+
+@dataclass
+class ReviewCandidate:
+    cluster_survivor_poi_id: str
+    candidate_poi_id: str
+    candidate_name: str
+    distance_m: float
+    shared_tokens: list[str]
+
+
+@dataclass
+class ClusterResult:
+    clusters: list[Cluster]
+    review_candidates: list[ReviewCandidate]
+
+
+def _lonlat(row: Row) -> tuple[float, float]:
+    return float(row["lon"]), float(row["lat"])
+
+
+def _quality(row: Row) -> float:
+    try:
+        return float(row.get("quality_score", "") or 0.0)
+    except ValueError:
+        return 0.0
+
+
+def _lineage_key(row: Row, relation_keys: set[str]) -> str | None:
+    """Cluster key from OSM relation lineage, independent of relation-row survival."""
+    parent = row.get("parent_relation_id", "").strip()
+    if parent:
+        return parent
+    if row["dedupe_key"] in relation_keys:
+        return row["dedupe_key"]
+    return None
+
+
+def build_clusters(rows: list[Row]) -> ClusterResult:
+    relation_keys = {
+        ref
+        for row in rows
+        for ref in (row.get("parent_relation_id", "").strip(),)
+        if ref
+    }
+    # Also treat any relation row that lists members as a cluster seed.
+    for row in rows:
+        if row.get("osm_member_refs", "").strip():
+            relation_keys.add(row["dedupe_key"])
+
+    lineage: dict[str, Cluster] = {}
+    unclustered: list[Row] = []
+    for row in rows:
+        key = _lineage_key(row, relation_keys)
+        if key is None:
+            unclustered.append(row)
+            continue
+        cluster = lineage.setdefault(key, Cluster(rows=[]))
+        cluster.rows.append(row)
+        cluster.reasons.add("osm_relation_members")
+
+    review_candidates: list[ReviewCandidate] = []
+    leftover: list[Row] = []
+    for row in unclustered:
+        lon, lat = _lonlat(row)
+        tokens = significant_tokens(row["name"])
+        best_cluster: Cluster | None = None
+        best_distance = ABSORB_RADIUS_M
+        review_hit: tuple[Cluster, float, set[str]] | None = None
+        for cluster in lineage.values():
+            for member in cluster.rows:
+                shared = tokens & significant_tokens(member["name"])
+                if not shared:
+                    continue
+                m_lon, m_lat = _lonlat(member)
+                distance = haversine_m(lon, lat, m_lon, m_lat)
+                if distance <= best_distance:
+                    best_distance = distance
+                    best_cluster = cluster
+                elif distance <= REVIEW_RADIUS_M and review_hit is None:
+                    review_hit = (cluster, distance, shared)
+        if best_cluster is not None:
+            best_cluster.rows.append(row)
+            best_cluster.reasons.add("node_proximity")
+        elif review_hit is not None:
+            cluster, distance, shared = review_hit
+            survivor = _select_survivor(cluster.rows)
+            review_candidates.append(
+                ReviewCandidate(
+                    cluster_survivor_poi_id=survivor["poi_id"],
+                    candidate_poi_id=row["poi_id"],
+                    candidate_name=row["name"],
+                    distance_m=round(distance, 2),
+                    shared_tokens=sorted(shared),
+                )
+            )
+            leftover.append(row)
+        else:
+            leftover.append(row)
+
+    clusters = list(lineage.values()) + [Cluster(rows=[row]) for row in leftover]
+    return ClusterResult(clusters=clusters, review_candidates=review_candidates)
+
+
+def _select_survivor(rows: list[Row]) -> Row:  # replaced in Task 3
+    return max(rows, key=_quality)
