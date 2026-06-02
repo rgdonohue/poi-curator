@@ -87,8 +87,11 @@ class ClusterResult:
     review_candidates: list[ReviewCandidate]
 
 
-def _lonlat(row: Row) -> tuple[float, float]:
-    return float(row["lon"]), float(row["lat"])
+def _lonlat(row: Row) -> tuple[float, float] | None:
+    try:
+        return float(row["lon"]), float(row["lat"])
+    except (KeyError, ValueError):
+        return None
 
 
 def _quality(row: Row) -> float:
@@ -134,28 +137,42 @@ def build_clusters(rows: list[Row]) -> ClusterResult:
     review_candidates: list[ReviewCandidate] = []
     leftover: list[Row] = []
     for row in unclustered:
-        lon, lat = _lonlat(row)
+        coords = _lonlat(row)
+        if coords is None:
+            # Unparseable coordinates: cannot compute distance, so this row can
+            # neither absorb into nor be absorbed by any cluster. It becomes a
+            # singleton and is never flagged for review.
+            leftover.append(row)
+            continue
+        lon, lat = coords
         tokens = significant_tokens(row["name"])
         best_cluster: Cluster | None = None
         best_distance = ABSORB_RADIUS_M
-        review_hit: tuple[Cluster, float, set[str]] | None = None
+        best_review: tuple[Cluster, float, set[str]] | None = None
         for cluster in lineage.values():
             for member in cluster.rows:
                 shared = tokens & significant_tokens(member["name"])
                 if not shared:
                     continue
-                m_lon, m_lat = _lonlat(member)
+                member_coords = _lonlat(member)
+                if member_coords is None:
+                    continue
+                m_lon, m_lat = member_coords
                 distance = haversine_m(lon, lat, m_lon, m_lat)
                 if distance <= best_distance:
+                    # Ties at equal distance resolve to the later cluster in
+                    # iteration order (deterministic given stable input).
                     best_distance = distance
                     best_cluster = cluster
-                elif distance <= REVIEW_RADIUS_M and review_hit is None:
-                    review_hit = (cluster, distance, shared)
+                elif ABSORB_RADIUS_M < distance <= REVIEW_RADIUS_M and (
+                    best_review is None or distance < best_review[1]
+                ):
+                    best_review = (cluster, distance, shared)
         if best_cluster is not None:
             best_cluster.rows.append(row)
             best_cluster.reasons.add("node_proximity")
-        elif review_hit is not None:
-            cluster, distance, shared = review_hit
+        elif best_review is not None:
+            cluster, distance, shared = best_review
             survivor = _select_survivor(cluster.rows)
             review_candidates.append(
                 ReviewCandidate(

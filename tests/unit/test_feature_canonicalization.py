@@ -108,6 +108,42 @@ def test_review_candidate_in_near_miss_band() -> None:
     assert any(rc.candidate_poi_id == "near" for rc in result.review_candidates)
 
 
+def test_row_with_missing_coordinates_becomes_singleton() -> None:
+    rows = _tudesque_rows()
+    rows.append(_row(poi_id="bad", dedupe_key="osm:node/888", name="Tudesque House",
+                     lon="", lat="", quality_score="30"))
+    result = build_clusters(rows)
+    bad_clusters = [c for c in result.clusters if any(r["poi_id"] == "bad" for r in c.rows)]
+    assert len(bad_clusters) == 1
+    assert len(bad_clusters[0].rows) == 1  # singleton, not merged
+
+
+def test_review_candidate_reports_nearest_cluster() -> None:
+    # Two lineage clusters; a same-token non-member ~50m from cluster B, far from A.
+    rows = [
+        _row(poi_id="a-rel", dedupe_key="osm:relation/1", name="Tudesque House",
+             lon="-105.950", lat="35.690", quality_score="80",
+             osm_member_refs="osm:way/10"),
+        _row(poi_id="a-w", dedupe_key="osm:way/10", name="Tudesque House West",
+             lon="-105.950", lat="35.690", quality_score="60",
+             parent_relation_id="osm:relation/1"),
+        _row(poi_id="b-rel", dedupe_key="osm:relation/2", name="Tudesque House",
+             lon="-105.93903", lat="35.68416", quality_score="80",
+             osm_member_refs="osm:way/20"),
+        _row(poi_id="b-w", dedupe_key="osm:way/20", name="Tudesque House West",
+             lon="-105.93903", lat="35.68416", quality_score="60",
+             parent_relation_id="osm:relation/2"),
+        # ~50m from cluster B (-105.93958,35.68416), >1km from cluster A.
+        _row(poi_id="near", dedupe_key="osm:node/999", name="Tudesque Annex",
+             lon="-105.93958", lat="35.68416", quality_score="40"),
+    ]
+    result = build_clusters(rows)
+    near_candidates = [rc for rc in result.review_candidates if rc.candidate_poi_id == "near"]
+    assert len(near_candidates) == 1
+    assert near_candidates[0].cluster_survivor_poi_id in {"b-rel", "b-w"}
+    assert near_candidates[0].distance_m < 60.0
+
+
 def test_two_generic_house_rows_within_35m_do_not_merge() -> None:
     rows = [
         _row(poi_id="a", dedupe_key="osm:node/1", name="Adobe House",
