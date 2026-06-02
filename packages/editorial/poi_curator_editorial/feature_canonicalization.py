@@ -264,6 +264,26 @@ def _union_pipe(values: list[str]) -> str:
     return "|".join(out)
 
 
+def _dropped_entry(row: Row, survivor: Row) -> dict[str, Any]:
+    row_coords = _lonlat(row)
+    survivor_coords = _lonlat(survivor)
+    if row_coords is None or survivor_coords is None:
+        distance_m: float | None = None
+        lon: float | None = row_coords[0] if row_coords else None
+        lat: float | None = row_coords[1] if row_coords else None
+    else:
+        lon, lat = row_coords
+        distance_m = round(haversine_m(lon, lat, survivor_coords[0], survivor_coords[1]), 2)
+    return {
+        "poi_id": row["poi_id"],
+        "dedupe_key": row["dedupe_key"],
+        "name": row["name"],
+        "lon": lon,
+        "lat": lat,
+        "distance_m": distance_m,
+    }
+
+
 def merge_cluster(cluster: Cluster) -> tuple[Row, dict[str, Any]]:
     """Collapse a cluster to one row plus a manifest entry. Singletons pass through."""
     survivor = dict(select_survivor(cluster.rows))
@@ -296,23 +316,7 @@ def merge_cluster(cluster: Cluster) -> tuple[Row, dict[str, Any]]:
         "survivor_dedupe_key": survivor["dedupe_key"],
         "chosen_display_name": chosen_name,
         "alias_names": aliases,
-        "dropped": [
-            {
-                "poi_id": row["poi_id"],
-                "dedupe_key": row["dedupe_key"],
-                "name": row["name"],
-                "lon": float(row["lon"]),
-                "lat": float(row["lat"]),
-                "distance_m": round(
-                    haversine_m(
-                        float(row["lon"]), float(row["lat"]),
-                        float(survivor["lon"]), float(survivor["lat"]),
-                    ),
-                    2,
-                ),
-            }
-            for row in dropped
-        ],
+        "dropped": [_dropped_entry(row, survivor) for row in dropped],
         "merge_reason": survivor["merge_reason"],
     }
     return survivor, entry

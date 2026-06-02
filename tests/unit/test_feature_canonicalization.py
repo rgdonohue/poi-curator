@@ -246,3 +246,30 @@ def test_merge_is_idempotent_on_already_merged_row() -> None:
     again, _ = merge_cluster(Cluster(rows=[dict(merged_once)], reasons=set()))
     assert again["preferred_aliases"] == merged_once["preferred_aliases"]
     assert again["merged_from"] == ""  # singleton: nothing collapsed
+
+
+def test_merge_cluster_handles_blank_coord_member() -> None:
+    # A lineage member with empty coords must not crash the merge.
+    rows = _tudesque_rows()
+    for r in rows:
+        if r["poi_id"] == "p-e":
+            r["lon"] = ""
+            r["lat"] = ""
+    big = next(c for c in build_clusters(rows).clusters if len(c.rows) > 1)
+    row, entry = merge_cluster(big)  # must not raise
+    blank = next(d for d in entry["dropped"] if d["poi_id"] == "p-e")
+    assert blank["distance_m"] is None
+
+
+def test_merge_cluster_blank_coord_survivor_does_not_crash() -> None:
+    # Survivor with blank coords: distances become None, no crash.
+    rows = [
+        _row(poi_id="s", dedupe_key="osm:relation/1", name="A",
+             lon="", lat="", quality_score="90", osm_member_refs="osm:way/2"),
+        _row(poi_id="m", dedupe_key="osm:way/2", name="A",
+             lon="-105.9", lat="35.6", quality_score="50",
+             parent_relation_id="osm:relation/1"),
+    ]
+    big = next(c for c in build_clusters(rows).clusters if len(c.rows) > 1)
+    row, entry = merge_cluster(big)  # must not raise
+    assert all(d["distance_m"] is None for d in entry["dropped"])
