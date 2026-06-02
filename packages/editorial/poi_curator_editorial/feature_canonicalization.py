@@ -325,12 +325,49 @@ def merge_cluster(cluster: Cluster) -> tuple[Row, dict[str, Any]]:
 MANIFEST_SCHEMA_VERSION = 1
 
 
+def _count_colocated_groups(rows: list[Row]) -> int:
+    """Count connected components (size >= 2) of survivors within ABSORB_RADIUS_M.
+
+    A human sanity-check: how many multi-row spatial co-locations were
+    intentionally left unmerged (legitimately distinct features sharing a spot).
+    """
+    coords: list[tuple[float, float] | None] = [_lonlat(row) for row in rows]
+    parent = list(range(len(rows)))
+
+    def find(node: int) -> int:
+        while parent[node] != node:
+            parent[node] = parent[parent[node]]
+            node = parent[node]
+        return node
+
+    def union(a: int, b: int) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for i in range(len(rows)):
+        left = coords[i]
+        if left is None:
+            continue
+        for j in range(i + 1, len(rows)):
+            right = coords[j]
+            if right is None:
+                continue
+            if haversine_m(left[0], left[1], right[0], right[1]) <= ABSORB_RADIUS_M:
+                union(i, j)
+
+    sizes: dict[int, int] = {}
+    for node in range(len(rows)):
+        root = find(node)
+        sizes[root] = sizes.get(root, 0) + 1
+    return sum(1 for size in sizes.values() if size >= 2)
+
+
 def canonicalize(rows: list[Row]) -> tuple[list[Row], dict[str, Any]]:
     result = build_clusters(rows)
     merged_rows: list[Row] = []
     cluster_entries: list[dict[str, Any]] = []
     clusters_collapsed = 0
-    clusters_left_colocated = 0
 
     for cluster in result.clusters:
         row, entry = merge_cluster(cluster)
@@ -339,22 +376,7 @@ def canonicalize(rows: list[Row]) -> tuple[list[Row], dict[str, Any]]:
             clusters_collapsed += 1
             cluster_entries.append(entry)
 
-    # Count multi-row spatial co-locations we intentionally did NOT merge: any two
-    # surviving rows within ABSORB_RADIUS_M of each other.
-    for i, left in enumerate(merged_rows):
-        left_coords = _lonlat(left)
-        if left_coords is None:
-            continue
-        for right in merged_rows[i + 1 :]:
-            right_coords = _lonlat(right)
-            if right_coords is None:
-                continue
-            if (
-                haversine_m(left_coords[0], left_coords[1], right_coords[0], right_coords[1])
-                <= ABSORB_RADIUS_M
-            ):
-                clusters_left_colocated += 1
-                break
+    clusters_left_colocated = _count_colocated_groups(merged_rows)
 
     manifest: dict[str, Any] = {
         "schema_version": MANIFEST_SCHEMA_VERSION,

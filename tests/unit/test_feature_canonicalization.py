@@ -301,3 +301,22 @@ def test_canonicalize_is_idempotent() -> None:
     alias_twice = next(r["preferred_aliases"] for r in merged_twice if r["poi_id"] == "p-rel")
     assert alias_once == alias_twice  # lists do not grow
     assert manifest2["summary"]["clusters_collapsed"] == 0  # nothing left to collapse
+
+
+def test_colocated_group_counted_once() -> None:
+    # Three survivors within ~10m of each other but with DISTINCT names and no
+    # lineage -> never merged, but counted as ONE co-located group.
+    rows = [
+        _row(poi_id="g1", dedupe_key="osm:node/1", name="Gallery Alpha",
+             lon="-105.93900", lat="35.68410", quality_score="50"),
+        _row(poi_id="g2", dedupe_key="osm:node/2", name="Studio Beta",
+             lon="-105.93901", lat="35.68411", quality_score="50"),
+        _row(poi_id="g3", dedupe_key="osm:node/3", name="Museum Gamma",
+             lon="-105.93902", lat="35.68409", quality_score="50"),
+        # A far-away lone survivor: not part of any group.
+        _row(poi_id="far", dedupe_key="osm:node/9", name="Distant Place",
+             lon="-105.99", lat="35.60", quality_score="50"),
+    ]
+    merged, manifest = canonicalize(rows)
+    assert len(merged) == 4  # nothing merged (distinct names, no lineage)
+    assert manifest["summary"]["clusters_left_colocated"] == 1  # one group, not 3
