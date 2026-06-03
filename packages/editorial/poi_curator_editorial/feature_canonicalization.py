@@ -11,10 +11,10 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from poi_curator_ingestion.matching import normalize_name_tokens
+from poi_curator_domain.text import normalize_name_tokens
 
 # Structural / type tokens that must never be the *only* shared token between
-# two rows. Layered on top of matching.COMMON_AFFIXES (the, de, san, fe, ...)
+# two rows. Layered on top of poi_curator_domain.text.COMMON_AFFIXES (the, de, san, fe, ...)
 # and the directional words below, which normalize_name_tokens does NOT strip.
 STRUCTURAL_TOKENS: frozenset[str] = frozenset(
     {
