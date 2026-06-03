@@ -11,7 +11,6 @@ from pathlib import Path
 
 INPUT_CSV = Path("reports/query_capable_pois_frontend_seed_described_v1.csv")
 CONTEXT_CSV = Path("reports/query_capable_pois_frontend_seed_context_v1.csv")
-OUTPUT_CSV = Path("reports/query_capable_pois_merged_v1.csv")
 OUTPUT_CSV_V2 = Path("reports/query_capable_pois_merged_v2.csv")
 MANIFEST_JSON = Path("reports/query_capable_pois_merged_v2_merge_manifest.json")
 LINEAGE_CSV = Path("reports/osm_relation_lineage.csv")
@@ -80,7 +79,6 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument("--input", type=Path, default=INPUT_CSV)
     parser.add_argument("--context", type=Path, default=CONTEXT_CSV)
-    parser.add_argument("--output", type=Path, default=OUTPUT_CSV)
     return parser.parse_args()
 
 
@@ -127,7 +125,10 @@ def load_relation_lineage(path: Path) -> tuple[dict[str, str], dict[str, str], i
         if first.startswith("#"):
             for field in first.lstrip("#").split():
                 if field.startswith("source_current_rows="):
-                    stamped_count = int(field.split("=", 1)[1])
+                    try:
+                        stamped_count = int(field.split("=", 1)[1])
+                    except ValueError:
+                        stamped_count = -1
         else:
             handle.seek(0)
         for row in csv.DictReader(handle):
@@ -147,6 +148,7 @@ def warn_if_lineage_stale(
     if not lineage_path.exists():
         print(f"WARNING: lineage artifact {lineage_path} missing; no relation merges applied")
         return
+    # Best-effort heuristic: mtimes reflect checkout order, can false-positive after git ops.
     if seed_path.exists() and lineage_path.stat().st_mtime < seed_path.stat().st_mtime:
         print(
             f"WARNING: lineage artifact {lineage_path} is older than seed {seed_path}; "
