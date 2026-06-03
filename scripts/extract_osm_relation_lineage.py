@@ -32,7 +32,10 @@ def relation_lineage_from_elements(
         ]
         if not member_ids:
             continue
-        lineage.append((f"relation/{element['id']}", member_ids))
+        relation_id = element.get("id")
+        if relation_id is None:
+            continue
+        lineage.append((f"relation/{relation_id}", member_ids))
     lineage.sort(key=lambda item: item[0])
     return lineage
 
