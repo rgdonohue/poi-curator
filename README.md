@@ -18,14 +18,20 @@ exports, or scoring behavior.
 
 ## Current Status
 
-This is no longer just a scaffold. The repository currently includes:
+This is no longer just a scaffold. The current Santa Fe County reference corpus has 743 active
+canonical POIs in PostGIS. The architecture is layered: OSM provides the working spatial spine;
+Wikidata, City historic districts, NRHP, NM HPD, NM DCA, GNIS, and NMOSE add institutional
+corroboration, official names, water-system context, provenance, and review queues; editorial
+policy decides what becomes traveler-facing. See `docs/ARCHITECTURE.md` for the conceptual model
+and `docs/DEPLOYMENT.md` for the template for another city.
+
+The repository currently includes:
 
 - FastAPI public and admin APIs
 - Postgres/PostGIS schema with Alembic migrations
 - OSM/Overpass ingestion and canonicalization pipeline
-- multi-source NRHP, NM HPD, NM DCA, GNIS, NMOSE POD/acequia, and City of Santa Fe source
-  ingestion alongside OSM
-- Wikidata and City GIS enrichment paths
+- seven implemented source families around the OSM spine: Wikidata, City of Santa Fe historic
+  districts, NRHP, NM HPD, NM DCA, GNIS, and NMOSE POD/acequia
 - evidence, alias, diagnostic, field-provenance, match-log, query-log, and theme-membership tables
 - deterministic route and nearby scoring with score breakdowns
 - editorial mutation paths for review state, aliases, match diagnostics, and theme overrides
@@ -38,6 +44,13 @@ This is no longer just a scaffold. The repository currently includes:
 The current reference geography is Santa Fe. The implemented public categories are `history`,
 `culture`, `art`, `scenic`, `food`, `civic`, and `mixed`. Query-active themes are `water` and
 `rail`; `public_memory` is modeled but intentionally not public-query-active yet.
+
+The live editorial backlog is source-shaped rather than generic cleanup: 104 GNIS-demoted records
+await review, 64 geocoded HPD candidates require human promotion or rejection, 72 HPD
+no-coordinate diagnostics remain retained, 73 legacy HPD diagnostics are still unreviewed, 19 NRHP
+diagnostics remain retained, and 35 short-description conflicts need prose review. Known
+name/description/coordinate/category conflict patterns have one canonical provenance value while
+keeping all sourced alternates visible.
 
 ## Quickstart
 
@@ -234,6 +247,9 @@ historical/cultural facts.
 
 ## Governance Docs
 
+- `docs/ARCHITECTURE.md`: high-level architectural overview of the layered source-ecology model,
+  canonical/evidence split, matching, editorial layer, and Santa Fe reference deployment
+- `docs/DEPLOYMENT.md`: deployment template for adapting POI Curator to another city
 - `docs/DATA_QUALITY_GOVERNANCE.md`: data classes, synthetic data policy, source-bias caveats,
   export governance, and review roadmap
 - `docs/METHODOLOGY.md`: implemented source, processing, scoring, and review methodology
