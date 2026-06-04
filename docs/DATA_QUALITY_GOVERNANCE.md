@@ -212,6 +212,32 @@ Recommended fields for current or future exports:
 Do not publish an export that mixes DB-backed and fixture-overlay rows without a visible
 `record_origin` or equivalent field.
 
+### Same-Feature Canonicalization
+
+OSM frequently expresses one physical place as several records (a relation plus its member ways
+plus a node), which surfaces as multiple pins for the same feature in Detour. Export-time
+canonicalization collapses these into one canonical row. It is lineage-anchored: the primary signal
+is authoritative OSM relation-to-member-way lineage (a relation and its members are the same
+feature). A non-member node or way is absorbed only when it is within 35 m of the nearest cluster
+member AND shares at least one significant name token (structural or directional words like House,
+Park, East, West do not count). Proximity alone never merges anything, so legitimately co-located
+distinct features are preserved (for example, separate Canyon Road galleries, or the two ends of
+Santa Fe River Park). Rows 35-75 m from a cluster that share a significant token are not merged;
+they are surfaced as `review_candidates` for human review.
+
+The canonical row keeps the highest-quality geometry and `quality_score`; the display name is
+chosen separately by strongest identity evidence (state register, NRHP, historic), and other names
+become aliases. Every surviving row carries audit columns `merged_from` (collapsed dedupe_keys) and
+`merge_reason` (`osm_relation_members`, `node_proximity`, or both). A merge manifest records a
+`summary`, per-cluster decisions, review candidates, and a `secondary_flags` list (issues flagged,
+not fixed). The output `reports/query_capable_pois_merged_v2.csv` shares v1's schema plus those two
+columns. Lineage comes from a committed, provenance-stamped `reports/osm_relation_lineage.csv`,
+regenerated via `scripts/extract_osm_relation_lineage.py`: it reads which OSM relations exist from
+`poi_source_raw`, then fetches their member ways/nodes live from Overpass (`out geom;`), because the
+ingest query stored relation bounds without members. Re-run it after re-ingestion or when relation
+membership changes; the export emits a staleness warning if the artifact is missing or older than
+the seed. See `docs/superpowers/specs/2026-06-01-same-feature-canonicalization-design.md`.
+
 ## Fixture Fallback Governance
 
 The hybrid scoring backend can fall back to fixture data. This is useful for tests and local UI

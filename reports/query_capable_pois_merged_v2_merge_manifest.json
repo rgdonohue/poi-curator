@@ -1,0 +1,70 @@
+{
+  "clusters": [
+    {
+      "alias_names": [
+        "Tudesque House",
+        "Roque Tudesque House East",
+        "Roque Tudesque House West"
+      ],
+      "chosen_display_name": "Roque Tudesque House",
+      "dropped": [
+        {
+          "dedupe_key": "osm:way/461729209",
+          "distance_m": 9.64,
+          "lat": 35.684025653980406,
+          "lon": -105.9387482642101,
+          "name": "Roque Tudesque House East",
+          "poi_id": "55532e60-6a27-4dd4-85c2-8d13c06b7714"
+        },
+        {
+          "dedupe_key": "osm:way/461729208",
+          "distance_m": 20.17,
+          "lat": 35.6841571533804,
+          "lon": -105.93903457267577,
+          "name": "Roque Tudesque House West",
+          "poi_id": "f4994c95-7b51-48af-9d06-1fb2cba71ff6"
+        },
+        {
+          "dedupe_key": "osm:node/6479254097",
+          "distance_m": 11.53,
+          "lat": 35.6841299,
+          "lon": -105.938944,
+          "name": "Roque Tudesque House",
+          "poi_id": "8794c23f-a0dc-4e50-98d8-21aa90e49e5a"
+        }
+      ],
+      "merge_reason": "osm_relation_members",
+      "survivor_dedupe_key": "osm:relation/13422888",
+      "survivor_poi_id": "027d8e3a-2850-43db-9f64-1496fd5a83ef"
+    },
+    {
+      "alias_names": [
+        "Milner Plaza"
+      ],
+      "chosen_display_name": "Performance Circle",
+      "dropped": [
+        {
+          "dedupe_key": "osm:way/686516978",
+          "distance_m": 32.36,
+          "lat": 35.66462396610062,
+          "lon": -105.92524167676272,
+          "name": "Performance Circle",
+          "poi_id": "bbee8ec5-ca60-4cbd-9ea0-396893a0c535"
+        }
+      ],
+      "merge_reason": "osm_relation_members",
+      "survivor_dedupe_key": "osm:relation/6971566",
+      "survivor_poi_id": "a1b027be-10de-4b40-aad8-5d013839a440"
+    }
+  ],
+  "review_candidates": [],
+  "schema_version": 1,
+  "secondary_flags": [],
+  "summary": {
+    "clusters_collapsed": 2,
+    "clusters_left_colocated": 45,
+    "review_candidates": 0,
+    "rows_after": 512,
+    "rows_before": 516
+  }
+}

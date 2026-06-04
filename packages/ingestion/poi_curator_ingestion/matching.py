@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import math
-import re
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from difflib import SequenceMatcher
 from typing import Any, Literal
 
 from poi_curator_domain.db import POI, OfficialMatchDiagnostic, POIEvidence, POIMatchLog
+from poi_curator_domain.text import normalize_name_tokens
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session, joinedload
 
@@ -17,25 +17,6 @@ DEFAULT_MATCH_CONFIG: dict[str, float] = {
     "spatial_distance_threshold_m": 100.0,
     "name_similarity_threshold": 0.85,
 }
-
-COMMON_AFFIXES = {
-    "the",
-    "of",
-    "and",
-    "de",
-    "la",
-    "las",
-    "los",
-    "san",
-    "santa",
-    "fe",
-    "saint",
-    "st",
-    "historic",
-    "historical",
-}
-TOKEN_RE = re.compile(r"[a-z0-9]+")
-
 
 @dataclass(frozen=True)
 class IncomingSourceRecord:
@@ -171,17 +152,6 @@ def normalized_name_similarity(left: str, right: str) -> float:
         " ".join(sorted(right_tokens)),
     ).ratio()
     return max(overlap, ratio)
-
-
-def normalize_name_tokens(value: str) -> set[str]:
-    tokens = set()
-    for token in TOKEN_RE.findall(value.casefold()):
-        if token in COMMON_AFFIXES:
-            continue
-        if token.endswith("s") and len(token) > 4:
-            token = token[:-1]
-        tokens.add(token)
-    return tokens
 
 
 def approx_distance_m(lon: float, lat: float, poi: POI) -> float:
