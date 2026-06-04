@@ -229,6 +229,13 @@ The repo includes a temporary export path for the Detour frontend seed inventory
 - `docs/DESCRIPTION_ENRICHMENT_WORKFLOW.md`: optional extractor/writer/critic workflow for
   conservative description drafting
 - `scripts/generate_frontend_seed_descriptions.py`: deterministic description generator
+- `reports/query_capable_pois_merged_v2.csv`: Detour export with same-feature OSM duplicates
+  collapsed; same schema as v1 plus `merged_from`/`merge_reason` audit columns
+- `reports/query_capable_pois_merged_v2_merge_manifest.json`: per-cluster merge audit and review
+  candidates
+- `scripts/extract_osm_relation_lineage.py`: produces the committed
+  `reports/osm_relation_lineage.csv` relation-to-member lineage artifact consumed by the v2 export
+  (re-run after re-ingestion)
 
 This workflow does not overwrite canonical POI descriptions. Treat these exports as handoff/review
 artifacts until reviewed. Generated descriptions are drafts, not source data and not canonical
