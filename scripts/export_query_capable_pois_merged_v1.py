@@ -90,8 +90,8 @@ def main() -> int:
     contexts = load_contexts(args.context)
     rows = build_export_rows(seed_rows, contexts)
 
-    parent_of, members_of, stamped_count = load_relation_lineage(LINEAGE_CSV)
-    warn_if_lineage_stale(LINEAGE_CSV, args.input, stamped_count, len(seed_rows))
+    parent_of, members_of, _stamped_count = load_relation_lineage(LINEAGE_CSV)
+    warn_if_lineage_stale(LINEAGE_CSV, args.input)
     attach_lineage_columns(rows, parent_of, members_of)
 
     merged_rows, manifest = canonicalize(rows)
@@ -142,9 +142,7 @@ def load_relation_lineage(path: Path) -> tuple[dict[str, str], dict[str, str], i
     return parent_of, members_of, stamped_count
 
 
-def warn_if_lineage_stale(
-    lineage_path: Path, seed_path: Path, stamped_count: int, seed_row_count: int
-) -> None:
+def warn_if_lineage_stale(lineage_path: Path, seed_path: Path) -> None:
     if not lineage_path.exists():
         print(f"WARNING: lineage artifact {lineage_path} missing; no relation merges applied")
         return
@@ -153,11 +151,6 @@ def warn_if_lineage_stale(
         print(
             f"WARNING: lineage artifact {lineage_path} is older than seed {seed_path}; "
             "re-run scripts/extract_osm_relation_lineage.py"
-        )
-    if 0 <= stamped_count and abs(stamped_count - seed_row_count) > seed_row_count:
-        print(
-            f"WARNING: lineage source_current_rows={stamped_count} differs sharply from "
-            f"seed rows={seed_row_count}; lineage may be stale"
         )
 
 
