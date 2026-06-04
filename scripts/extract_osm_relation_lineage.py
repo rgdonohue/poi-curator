@@ -12,6 +12,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+import httpx
+
 OUTPUT_CSV = Path("reports/osm_relation_lineage.csv")
 OSM_SOURCE_NAME = "osm_overpass"
 LINEAGE_FIELDNAMES = ["relation_record_id", "member_record_ids"]
@@ -56,6 +58,57 @@ def write_lineage_csv(
             writer.writerow([relation_id, "|".join(member_ids)])
 
 
+def relation_ids_from_raw(raw_payloads: list[dict[str, Any]]) -> list[int]:
+    """Return sorted unique ids of payloads whose type is "relation"."""
+    ids = {
+        payload["id"]
+        for payload in raw_payloads
+        if payload.get("type") == "relation" and payload.get("id") is not None
+    }
+    return sorted(ids)
+
+
+def fetch_relation_members(relation_ids: list[int]) -> list[dict[str, Any]]:
+    """Fetch relations (with members) live from Overpass via ``out geom;``.
+
+    The ingest corpus was queried with ``out ... center ...`` which drops the
+    members list, so member lineage cannot come from ``poi_source_raw``. We read
+    which relations exist from the DB and re-fetch their members here.
+    """
+    if not relation_ids:
+        return []
+
+    from poi_curator_domain.settings import get_settings
+
+    settings = get_settings()
+    ids = ",".join(map(str, relation_ids))
+    query = f"[out:json][timeout:120];rel(id:{ids});out geom;"
+
+    endpoints = [settings.overpass_url]
+    if settings.overpass_fallback_url not in endpoints:
+        endpoints.append(settings.overpass_fallback_url)
+
+    last_error: Exception | None = None
+    for endpoint in endpoints:
+        try:
+            with httpx.Client(
+                timeout=max(120, settings.overpass_timeout_seconds)
+            ) as client:
+                response = client.post(
+                    endpoint,
+                    data={"data": query},
+                    headers={"User-Agent": "poi-curator/0.1.0"},
+                )
+                response.raise_for_status()
+                payload = response.json()
+            return list(payload.get("elements", []))
+        except (httpx.HTTPStatusError, httpx.RequestError) as exc:
+            last_error = exc
+
+    assert last_error is not None
+    raise last_error
+
+
 def main() -> int:
     from poi_curator_domain.db import POISourceRaw, get_session_factory
     from sqlalchemy import select
@@ -70,11 +123,16 @@ def main() -> int:
                 )
             )
         )
-        elements = [row.raw_payload_json for row in rows]
+        payloads = [row.raw_payload_json for row in rows]
+    relation_ids = relation_ids_from_raw(payloads)
+    elements = fetch_relation_members(relation_ids)
     lineage = relation_lineage_from_elements(elements)
-    write_lineage_csv(OUTPUT_CSV, lineage, source_row_count=len(elements))
+    write_lineage_csv(OUTPUT_CSV, lineage, source_row_count=len(payloads))
     print(f"wrote {OUTPUT_CSV}")
-    print(f"relations_with_members={len(lineage)} source_current_rows={len(elements)}")
+    print(
+        f"relations_queried={len(relation_ids)} "
+        f"relations_with_members={len(lineage)} source_current_rows={len(payloads)}"
+    )
     return 0
 
 

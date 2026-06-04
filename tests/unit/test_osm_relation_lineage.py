@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Any
 
+import pytest
+
 from scripts.extract_osm_relation_lineage import (
     LINEAGE_FIELDNAMES,
     relation_lineage_from_elements,
@@ -84,3 +86,33 @@ def test_relation_lineage_sorted_and_guards_members() -> None:
         ("relation/100", ["way/1"]),
         ("relation/200", ["way/2"]),
     ]
+
+
+def test_relation_ids_from_raw_returns_sorted_unique_relation_ids() -> None:
+    from scripts.extract_osm_relation_lineage import relation_ids_from_raw
+    payloads = [
+        {"type": "relation", "id": 200},
+        {"type": "way", "id": 5},
+        {"type": "relation", "id": 100},
+        {"type": "node", "id": 9},
+        {"type": "relation", "id": 200},  # dup
+    ]
+    assert relation_ids_from_raw(payloads) == [100, 200]
+
+
+def test_relation_ids_from_raw_empty() -> None:
+    from scripts.extract_osm_relation_lineage import relation_ids_from_raw
+    assert relation_ids_from_raw([{"type": "way", "id": 1}]) == []
+
+
+def test_fetch_relation_members_empty_short_circuits(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # No ids -> no network call, returns [].
+    import scripts.extract_osm_relation_lineage as ext
+
+    def _boom(*a: Any, **k: Any) -> Any:  # pragma: no cover
+        raise AssertionError("network should not be called for empty ids")
+
+    monkeypatch.setattr(ext.httpx, "post", _boom)
+    assert ext.fetch_relation_members([]) == []
