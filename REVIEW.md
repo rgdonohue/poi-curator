@@ -432,3 +432,33 @@ Score drift and baseline decision:
   regression.
 - Promoted `reports/check_runs/20260511T105213Z/` to
   `reports/check_runs/20260511T_hpd_dca_baseline/` and updated `README.md` to point to it.
+
+## Bulk Conflict Resolution / HPD Geocoding Follow-Up — 2026-05-11
+
+Database curation outcomes:
+- Applied field-provenance policy to the 274 name, short-description, coordinate, and
+  primary-category conflict rows. Each now has exactly one provenance row marked canonical; source
+  alternates remain visible in `poi_field_conflicts`.
+- Left `gnis_feature_id` and `street_address` conflicts untouched because they are outside the
+  display-field policy.
+- Flagged 35 short-description conflicts for editorial prose review because they have no
+  OSM/common-use description source.
+- Ran the HPD address-geocoding pass over 136 retained `nm_hpd` no-coordinate diagnostics:
+  64 resolved to Santa Fe County geocodes and were queued as `geocoded_candidate_review`; 72 remain
+  unreviewed because of missing addresses, no Nominatim result, or an out-of-county result.
+- No geocoded HPD records matched existing canonicals under the current matcher thresholds, so no
+  `geocoded_coordinate` evidence rows were attached and no canonicals were promoted.
+
+Verification:
+- `.venv/bin/python -m pytest` - 188 passed.
+- `.venv/bin/ruff check .` - passed.
+- `.venv/bin/mypy apps packages tests` - passed with no issues in 93 source files.
+- Full saved check-suite run:
+  `.venv/bin/python scripts/run_check_suite.py --suite core-product --suite all-fixtures --suite empty-result-guardrails --suite rail-smoke`
+  - 28 passed, 0 failed. Output directory: `reports/check_runs/20260511T112319Z/`.
+
+Score drift and baseline decision:
+- Compared with `reports/check_runs/20260511T_hpd_dca_baseline/`, rounded result names, scores,
+  primary categories, and short descriptions were unchanged for every check case.
+- No baseline promotion is needed because this pass changed provenance flags, diagnostics, and
+  review queues rather than active scoring inputs.

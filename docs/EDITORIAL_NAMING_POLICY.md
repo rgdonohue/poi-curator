@@ -31,6 +31,18 @@ Canonical names are display labels for Detour. They should be readable to a trav
 9. DCA institutional names preserve public-facing museum/site branding.
    DCA source labels should corroborate institution identity, but they should not override a clearer common campus name already used by OSM or editorial review. Parent institution names and campus/site names can both be preserved as alternates; the canonical display should be the visitor-facing name for the specific place.
 
+10. Common-use short descriptions are display-canonical when available.
+   Prefer OSM-sourced or editorial/common-use short descriptions for display. NRHP and HPD register descriptions such as `National Register listed property` or `New Mexico State Register listed property` are preserved as sourced alternates because they describe evidence basis, not traveler-facing interpretation. If no common-use description exists, keep the current register-derived value as provisional and flag the POI for editorial description review.
+
+11. Coordinates prefer the displayed POI placement and the tightest public source.
+   When OSM and official/register coordinates differ at campus or parcel scale, the OSM coordinate remains display-canonical because it matches the currently shown POI placement; official coordinates remain sourced alternates. When no OSM coordinate exists, mark the source coordinate closest to the current canonical centroid as provenance-canonical. Address-geocoded coordinates are derived aids for review and are never display-canonical without human approval.
+
+12. Primary category is common-use first, register category second.
+   OSM or reviewed common-use categories remain display-primary when they describe current visitor use, for example `culture` or `civic`. Register sources often contribute `history`; preserve that value as sourced category provenance and in supporting category/evidence displays rather than replacing the common-use primary category. If no common-use source exists, keep the current canonical category and leave the conflict visible for review.
+
+13. Register descriptions and categories are evidence labels, not prose.
+   Formal register wording should not be promoted into descriptive copy merely because it is official. Use it to support provenance, source-basis filters, and corroboration; use editorial or common-use prose for public-facing description when available.
+
 ## Admin Display
 
-The admin viewer should show the canonical value as the highlighted value for each field and list all alternate sourced values below it. Name conflicts caused only by register order, accents, articles, parenthetical normalization, HPD register qualifiers, or DCA parent/campus naming should still be visible, but they can be treated as resolved normalization cases once exactly one provenance row is marked canonical.
+The admin viewer should show the canonical value as the highlighted value for each field and list all alternate sourced values below it. Name conflicts caused only by register order, accents, articles, parenthetical normalization, HPD register qualifiers, DCA parent/campus naming, register-description boilerplate, small coordinate offsets, or register/common-use category differences should still be visible, but they can be treated as resolved normalization cases once exactly one provenance row is marked canonical.
