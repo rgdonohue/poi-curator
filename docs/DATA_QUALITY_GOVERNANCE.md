@@ -232,9 +232,11 @@ become aliases. Every surviving row carries audit columns `merged_from` (collaps
 `summary`, per-cluster decisions, review candidates, and a `secondary_flags` list (issues flagged,
 not fixed). The output `reports/query_capable_pois_merged_v2.csv` shares v1's schema plus those two
 columns. Lineage comes from a committed, provenance-stamped `reports/osm_relation_lineage.csv`,
-regenerated via `scripts/extract_osm_relation_lineage.py` after re-ingestion; the export emits a
-staleness warning if the artifact is missing or out of date. See
-`docs/superpowers/specs/2026-06-01-same-feature-canonicalization-design.md`.
+regenerated via `scripts/extract_osm_relation_lineage.py`: it reads which OSM relations exist from
+`poi_source_raw`, then fetches their member ways/nodes live from Overpass (`out geom;`), because the
+ingest query stored relation bounds without members. Re-run it after re-ingestion or when relation
+membership changes; the export emits a staleness warning if the artifact is missing or older than
+the seed. See `docs/superpowers/specs/2026-06-01-same-feature-canonicalization-design.md`.
 
 ## Fixture Fallback Governance
 
