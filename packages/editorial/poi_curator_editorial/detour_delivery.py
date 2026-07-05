@@ -199,8 +199,23 @@ def build_delivery(
     dispositions_path: Path = DEFAULT_DISPOSITIONS,
     out_csv: Path = DEFAULT_OUT_CSV,
     out_manifest: Path = DEFAULT_OUT_MANIFEST,
+    overwrite: bool = False,
 ) -> dict[str, Any]:
-    """Deterministically build the Detour v2 delivery CSV + manifest."""
+    """Deterministically build the Detour v2 delivery CSV + manifest.
+
+    Refuses to overwrite existing output files unless ``overwrite=True``.
+    This protects the committed repo-root delivery pair from casual rebuilds;
+    cutting a new root delivery is an explicit --force action.
+    """
+    if not overwrite:
+        existing = [str(path) for path in (out_csv, out_manifest) if path.exists()]
+        if existing:
+            raise FileExistsError(
+                "refusing to overwrite existing delivery artifacts: "
+                + ", ".join(existing)
+                + " (pass --force / overwrite=True to cut a new delivery, "
+                "or choose an empty --out-dir)"
+            )
     dispositions = load_dispositions(dispositions_path)
     rows, fields = load_rows(v1_csv)
     rows_before = len(rows)

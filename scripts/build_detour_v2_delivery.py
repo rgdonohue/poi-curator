@@ -5,13 +5,17 @@ build-detour-v2`` console command.
 
 The human-triaged dispositions formerly hardcoded here now live in
 ``data/detour_v2_dispositions.json``. This shim preserves the old invocation
-(``python scripts/build_detour_v2_delivery.py``) and still writes the delivery
-pair to the repo root. Note the manifest is now stamped ``schema_version: 2``
-with input provenance; the committed delivery predates that and remains
-legacy ``schema_version: 1``. See docs/INTEGRATION_CONTRACT.md.
+(``python scripts/build_detour_v2_delivery.py``) and still targets the repo
+root, but it now refuses to overwrite the committed delivery pair unless
+``--force`` is passed — cutting a new root delivery is an explicit action.
+Note the manifest is now stamped ``schema_version: 2`` with input provenance;
+the committed delivery predates that and remains legacy ``schema_version: 1``.
+See docs/INTEGRATION_CONTRACT.md.
 """
 
 from __future__ import annotations
+
+import argparse
 
 from poi_curator_editorial.detour_delivery import (
     DEFAULT_OUT_CSV,
@@ -21,7 +25,20 @@ from poi_curator_editorial.detour_delivery import (
 
 
 def main() -> int:
-    manifest = build_delivery()
+    parser = argparse.ArgumentParser(
+        description="Build the repo-root Detour v2 delivery (explicit action).",
+    )
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="Overwrite the existing repo-root delivery pair.",
+    )
+    args = parser.parse_args()
+    try:
+        manifest = build_delivery(overwrite=args.force)
+    except FileExistsError as exc:
+        print(f"REFUSED: {exc}")
+        return 4
     summary = manifest["summary"]
     print(f"wrote {DEFAULT_OUT_CSV} and {DEFAULT_OUT_MANIFEST}")
     print(

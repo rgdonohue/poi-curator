@@ -31,6 +31,14 @@ app = typer.Typer(
 V1_CSV_OPTION = typer.Option(DEFAULT_V1_CSV, help="Input v1 merged export CSV.")
 DISPOSITIONS_OPTION = typer.Option(DEFAULT_DISPOSITIONS, help="Human-triaged dispositions JSON.")
 OUT_DIR_OPTION = typer.Option(Path("."), help="Directory for the output CSV and manifest.")
+FORCE_OPTION = typer.Option(
+    False,
+    "--force",
+    help=(
+        "Overwrite existing delivery artifacts. Required to cut a new repo-root "
+        "delivery over the committed pair."
+    ),
+)
 CSV_OPTION = typer.Option(DEFAULT_OUT_CSV, "--csv", help="Delivery CSV to verify.")
 MANIFEST_OPTION = typer.Option(
     DEFAULT_OUT_MANIFEST, "--manifest", help="Delivery merge manifest to verify."
@@ -42,8 +50,13 @@ def build_detour_v2(
     v1_csv: Path = V1_CSV_OPTION,
     dispositions: Path = DISPOSITIONS_OPTION,
     out_dir: Path = OUT_DIR_OPTION,
+    force: bool = FORCE_OPTION,
 ) -> None:
-    """Deterministically build the triaged Detour v2 delivery CSV + manifest."""
+    """Deterministically build the triaged Detour v2 delivery CSV + manifest.
+
+    Refuses to overwrite an existing delivery pair (such as the committed
+    repo-root artifacts) unless --force is passed.
+    """
     out_csv = out_dir / DEFAULT_OUT_CSV.name
     out_manifest = out_dir / DEFAULT_OUT_MANIFEST.name
     try:
@@ -52,7 +65,11 @@ def build_detour_v2(
             dispositions_path=dispositions,
             out_csv=out_csv,
             out_manifest=out_manifest,
+            overwrite=force,
         )
+    except FileExistsError as exc:
+        typer.echo(f"REFUSED: {exc}", err=True)
+        raise typer.Exit(code=4) from exc
     except DispositionError as exc:
         typer.echo(f"DISPOSITION ERROR: {exc}", err=True)
         raise typer.Exit(code=2) from exc

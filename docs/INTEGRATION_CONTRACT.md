@@ -192,6 +192,9 @@ checks them too):
 - Deliveries are deterministic: same inputs and dispositions produce byte-identical outputs.
   Regeneration after re-ingestion is a *new corpus snapshot*, requires re-running relation
   lineage extraction, re-triaging dispositions, and a fresh Detour-side verification pass.
+- Cutting a delivery is an explicit action: `build-detour-v2` refuses to overwrite an existing
+  CSV/manifest pair (including the committed repo-root delivery) unless `--force` is passed.
+  Day-to-day rebuilds go to an empty `--out-dir`; only a deliberate delivery cut uses `--force`.
 
 ### Out of contract (file surface)
 

@@ -23,7 +23,9 @@ from poi_curator_editorial.detour_delivery import (
     build_delivery,
     verify_delivery,
 )
+from poi_curator_editorial.export_cli import app as export_app
 from poi_curator_editorial.export_schema import ExportSchemaError
+from typer.testing import CliRunner
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = REPO_ROOT / "tests" / "fixtures" / "detour_delivery"
@@ -128,6 +130,63 @@ def test_golden_fixture_verify_passes(tmp_path: Path) -> None:
     )
 
     assert verify_delivery(out_csv, out_manifest) == []
+
+
+def build_small_fixture(out_csv: Path, out_manifest: Path, *, overwrite: bool = False) -> None:
+    build_delivery(
+        v1_csv=FIXTURES / "v1_small.csv",
+        dispositions_path=FIXTURES / "dispositions_small.json",
+        out_csv=out_csv,
+        out_manifest=out_manifest,
+        overwrite=overwrite,
+    )
+
+
+def test_build_refuses_to_overwrite_without_force(tmp_path: Path) -> None:
+    out_csv = tmp_path / "v2.csv"
+    out_manifest = tmp_path / "manifest.json"
+    build_small_fixture(out_csv, out_manifest)
+    first_csv = out_csv.read_bytes()
+    first_manifest = out_manifest.read_bytes()
+
+    with pytest.raises(FileExistsError, match="refusing to overwrite"):
+        build_small_fixture(out_csv, out_manifest)
+    assert out_csv.read_bytes() == first_csv, "refused build must not touch outputs"
+    assert out_manifest.read_bytes() == first_manifest
+
+    build_small_fixture(out_csv, out_manifest, overwrite=True)
+    assert out_csv.read_bytes() == first_csv, "forced rebuild stays deterministic"
+    assert out_manifest.read_bytes() == first_manifest
+
+
+def test_cli_casual_build_does_not_overwrite_existing_delivery(tmp_path: Path) -> None:
+    # Simulate the repo-root situation: the out-dir already holds a committed
+    # delivery pair. A casual build must refuse (exit 4) and leave it intact.
+    sentinel_csv = tmp_path / "query_capable_pois_merged_v2.csv"
+    sentinel_manifest = tmp_path / "query_capable_pois_merged_v2_merge_manifest.json"
+    sentinel_csv.write_text("committed delivery placeholder", encoding="utf-8")
+    sentinel_manifest.write_text("{}", encoding="utf-8")
+    runner = CliRunner()
+    base_args = [
+        "build-detour-v2",
+        "--v1-csv",
+        str(FIXTURES / "v1_small.csv"),
+        "--dispositions",
+        str(FIXTURES / "dispositions_small.json"),
+        "--out-dir",
+        str(tmp_path),
+    ]
+
+    result = runner.invoke(export_app, base_args)
+
+    assert result.exit_code == 4
+    assert sentinel_csv.read_text(encoding="utf-8") == "committed delivery placeholder"
+    assert sentinel_manifest.read_text(encoding="utf-8") == "{}"
+
+    forced = runner.invoke(export_app, [*base_args, "--force"])
+
+    assert forced.exit_code == 0
+    assert sentinel_csv.read_bytes() == (FIXTURES / "expected_v2.csv").read_bytes()
 
 
 def test_disposition_with_missing_dedupe_key_fails_loudly(tmp_path: Path) -> None:

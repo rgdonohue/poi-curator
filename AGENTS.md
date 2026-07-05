@@ -74,7 +74,13 @@ Use the virtualenv when present:
 .venv/bin/poi-curator-ingest osm --region santa-fe
 .venv/bin/poi-curator-enrich wikidata --region santa-fe
 .venv/bin/python scripts/run_check_suite.py --suite core-product
+.venv/bin/poi-curator-export verify-detour-v2
+.venv/bin/poi-curator-export build-detour-v2 --out-dir /tmp/some-empty-dir
 ```
+
+`poi-curator-export build-detour-v2` refuses to overwrite an existing delivery pair — including
+the committed repo-root Detour artifacts — unless `--force` is passed. Only use `--force` when
+deliberately cutting a new delivery. See `docs/INTEGRATION_CONTRACT.md`.
 
 Database-backed commands require PostGIS on `localhost:5432` by default. Start it with:
 
