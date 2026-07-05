@@ -1,0 +1,5 @@
+# Detour delivery golden fixtures are byte-exact captures of the export
+# builder's output, which uses the csv module's CRLF line endings (matching
+# the committed repo-root delivery CSV). CR at EOL is intentional here; do
+# not normalize, or the byte-for-byte golden tests will fail.
+tests/fixtures/detour_delivery/*.csv -text whitespace=cr-at-eol
