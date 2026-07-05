@@ -1,0 +1,120 @@
+{
+  "description": "Human-triaged dispositions for the Detour v2 delivery build. Every entry references dedupe_keys that must exist in the v1 merged export; the build fails loudly on any miss. Producer-internal: this file is not part of the Detour contract (see docs/INTEGRATION_CONTRACT.md).",
+  "schema_version": 1,
+  "excluded_rows": [
+    {
+      "dedupe_key": "osm:relation/18934145",
+      "reason": "out_of_bbox: lat 35.78200 is north of bbox max 35.78; linear National Historic Trail, not a stop-shaped pin; dropped",
+      "note": "A ~hundreds-of-mile National Historic Trail whose anchor sits 222 m north of the box. Not a stop-shaped pin; coordinate cannot be honestly corrected."
+    }
+  ],
+  "collapses": [
+    {
+      "reason": "osm_relation_members",
+      "members": [
+        "osm:relation/13422888",
+        "osm:way/461729209",
+        "osm:way/461729208",
+        "osm:node/6479254097"
+      ],
+      "note": "Roque Tudesque House: relation + its two member ways + member node (lineage)."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:way/473190151",
+        "osm:way/725191463",
+        "osm:way/1212812771"
+      ],
+      "note": "Guadalupe church: Santuario + Catholic Church + 'Our Lady' (same church, 3 OSM representations within ~59 m). NOT the Guadalupe Street Bridge (91 m, distinct)."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:way/475539174",
+        "osm:node/6615398270"
+      ],
+      "note": "Fire / Firefighters Museum."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:way/478163588",
+        "osm:way/946169067"
+      ],
+      "note": "United Church."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:way/686368793",
+        "osm:node/8973437607"
+      ],
+      "note": "Vietnam memorial."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:way/682544392",
+        "osm:node/6392062194",
+        "osm:node/6392062211"
+      ],
+      "note": "Cross of the Martyrs (the downtown cross; not Old Cross / Overlook, which are >250 m away)."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:node/6626953354",
+        "osm:node/6626953353"
+      ],
+      "note": "Dish pair A."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:node/7531555535",
+        "osm:node/7531555578"
+      ],
+      "note": "Dish pair B."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:node/9140510013",
+        "osm:node/6696363459"
+      ],
+      "note": "Dish pair C."
+    },
+    {
+      "reason": "name+proximity",
+      "members": [
+        "osm:node/357610899",
+        "osm:node/6946550897"
+      ],
+      "note": "Atalaya Mountain: same summit, two DB nodes ~39 m apart (gate blind-spot, >35 m). Same physical feature -> collapse by identity (don't await the gate)."
+    }
+  ],
+  "review_candidate_sets": [],
+  "data_quality_flags": [
+    {
+      "dedupe_key": "osm:way/santa-fe-plaza",
+      "issue": "hand-authored non-OSM dedupe_key; record_origin=fixture_overlay; overlaps real 'The Santa Fe Plaza' (osm:way/141165187) ~81 m away"
+    },
+    {
+      "dedupe_key": "osm:node/cross-martyrs",
+      "issue": "hand-authored non-OSM dedupe_key; record_origin=fixture_overlay; 'Cross of the Martyrs Overlook' ~290 m from the downtown Cross cluster"
+    },
+    {
+      "dedupe_key": "osm:way/canyon-road",
+      "issue": "hand-authored non-OSM dedupe_key; record_origin=fixture_overlay showcase point"
+    },
+    {
+      "dedupe_key": "osm:way/rail-yard",
+      "issue": "hand-authored non-OSM dedupe_key; record_origin=fixture_overlay showcase point"
+    },
+    {
+      "dedupe_key": "osm:node/7777929438",
+      "issue": "4th distinct 'Dish' location ~6 km from the others; category_fallback; likely stray/mis-tagged data, but isolated (not a redundant pin)"
+    }
+  ]
+}
