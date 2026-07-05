@@ -20,6 +20,7 @@ from poi_curator_editorial.detour_delivery import (
     build_delivery,
     verify_delivery,
 )
+from poi_curator_editorial.export_schema import ExportSchemaError
 
 app = typer.Typer(
     name="poi-curator-export",
@@ -55,6 +56,9 @@ def build_detour_v2(
     except DispositionError as exc:
         typer.echo(f"DISPOSITION ERROR: {exc}", err=True)
         raise typer.Exit(code=2) from exc
+    except ExportSchemaError as exc:
+        typer.echo(f"SCHEMA ERROR: {exc}", err=True)
+        raise typer.Exit(code=3) from exc
     summary = manifest["summary"]
     typer.echo(f"wrote {out_csv} and {out_manifest}")
     typer.echo(

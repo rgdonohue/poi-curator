@@ -29,6 +29,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from poi_curator_editorial.export_schema import (
+    AUDIT_COLUMNS,
+    BBOX,
+    DETOUR_REQUIRED_COLUMNS,
+    MERGE_REASONS,
+    ExportSchemaError,
+    validate_export_rows,
+    validate_manifest_payload,
+)
 from poi_curator_editorial.feature_canonicalization import (
     Cluster,
     haversine_m,
@@ -44,37 +53,11 @@ DEFAULT_DISPOSITIONS = Path("data/detour_v2_dispositions.json")
 DEFAULT_OUT_CSV = Path("query_capable_pois_merged_v2.csv")
 DEFAULT_OUT_MANIFEST = Path("query_capable_pois_merged_v2_merge_manifest.json")
 
-# Santa Fe bounding box (gate contract).
-BBOX = {"lon_min": -106.10, "lon_max": -105.80, "lat_min": 35.55, "lat_max": 35.78}
-
 # The allowlist must be derived at the SAME radius the gate fails on (<=35 m),
 # so left_colocated member sets match the gate's residual clusters exactly.
 GATE_RADIUS_M = 35.0
 
-AUDIT_COLUMNS = ["merged_from", "merge_reason"]
-
-COLLAPSE_REASONS = {"osm_relation_members", "name+proximity"}
-
-REQUIRED_18 = [
-    "poi_id",
-    "dedupe_key",
-    "name",
-    "lon",
-    "lat",
-    "primary_category",
-    "display_priority",
-    "quality_score",
-    "walk_affinity_hint",
-    "drive_affinity_hint",
-    "wikipedia_title",
-    "short_description",
-    "description_map_v1",
-    "description_card_v1",
-    "description_subcategory_v1",
-    "description_confidence_v1",
-    "description_basis_v1",
-    "address",
-]
+COLLAPSE_REASONS = MERGE_REASONS
 
 
 class DispositionError(ValueError):
@@ -340,7 +323,15 @@ def build_delivery(
         "data_quality_flags": dispositions.data_quality_flags,
     }
 
-    # 5) Write outputs (deterministic; no timestamps).
+    # 5) Validate against the versioned export contract before emitting anything.
+    schema_errors = validate_export_rows(out_fields, final_rows)
+    schema_errors += validate_manifest_payload(manifest)
+    if schema_errors:
+        raise ExportSchemaError(
+            "refusing to write delivery: " + "; ".join(schema_errors)
+        )
+
+    # 6) Write outputs (deterministic; no timestamps).
     out_csv.parent.mkdir(parents=True, exist_ok=True)
     with out_csv.open("w", newline="", encoding="utf-8") as handle:
         writer = csv.DictWriter(handle, fieldnames=out_fields, extrasaction="ignore")
@@ -368,18 +359,13 @@ def verify_delivery(
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     by_key = {row["dedupe_key"]: row for row in rows}
 
-    # 0) Manifest schema version and (for v2) provenance envelope.
-    schema_version = manifest.get("schema_version")
-    if schema_version not in (1, 2):
-        failures.append(f"unknown manifest schema_version: {schema_version!r}")
-    if schema_version == 2:
-        inputs = manifest.get("inputs") or {}
-        for input_name in ("v1_csv", "dispositions"):
-            if not (inputs.get(input_name) or {}).get("sha256"):
-                failures.append(f"manifest v2 missing inputs.{input_name}.sha256")
+    # 0) Versioned schema validation: row contract + manifest contract (v1 or v2).
+    failures += validate_export_rows(header, rows)
+    failures += validate_manifest_payload(manifest)
 
-    # 1) Schema: 18 required columns present + audit columns.
-    missing = [column for column in REQUIRED_18 if column not in header]
+    # 1) Schema: 18 required columns present + audit columns. Redundant with the
+    # header check above, but kept because it mirrors Detour's gate wording.
+    missing = [column for column in DETOUR_REQUIRED_COLUMNS if column not in header]
     if missing:
         failures.append(f"missing required columns: {missing}")
     for column in AUDIT_COLUMNS:
@@ -407,26 +393,25 @@ def verify_delivery(
             failures.append(f"out of bbox: {row['dedupe_key']} ({lon},{lat})")
 
     # 4) Manifest summary.rows_after == CSV row count.
-    if manifest["summary"]["rows_after"] != len(rows):
-        failures.append(
-            f"summary.rows_after={manifest['summary']['rows_after']} != csv rows={len(rows)}"
-        )
+    rows_after = (manifest.get("summary") or {}).get("rows_after")
+    if rows_after != len(rows):
+        failures.append(f"summary.rows_after={rows_after} != csv rows={len(rows)}")
 
     # 5) collapsed: survivor present in CSV; every dropped key absent.
     allowlisted: set[frozenset[str]] = set()
-    for cluster in manifest["clusters"]:
-        disposition = cluster["disposition"]
+    for cluster in manifest.get("clusters") or []:
+        disposition = cluster.get("disposition")
         if disposition == "collapsed":
-            if cluster["survivor_dedupe_key"] not in by_key:
-                failures.append(
-                    f"collapsed survivor missing from CSV: {cluster['survivor_dedupe_key']}"
-                )
-            for dropped in cluster["dropped"]:
-                if dropped["dedupe_key"] in by_key:
-                    failures.append(f"dropped key still in CSV: {dropped['dedupe_key']}")
+            survivor_key = cluster.get("survivor_dedupe_key")
+            if survivor_key not in by_key:
+                failures.append(f"collapsed survivor missing from CSV: {survivor_key}")
+            for dropped in cluster.get("dropped") or []:
+                if dropped.get("dedupe_key") in by_key:
+                    failures.append(f"dropped key still in CSV: {dropped.get('dedupe_key')}")
         elif disposition in ("left_colocated", "review_candidate"):
-            allowlisted.add(frozenset(cluster["members"]))
-            for key in cluster["members"]:
+            members = cluster.get("members") or []
+            allowlisted.add(frozenset(members))
+            for key in members:
                 if disposition == "left_colocated" and key not in by_key:
                     failures.append(f"left_colocated member missing from CSV: {key}")
 
