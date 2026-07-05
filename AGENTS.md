@@ -123,6 +123,8 @@ http://localhost:8000/map-test
 ## Useful Documentation
 
 - `README.md`: current project overview and quickstart.
+- `docs/INTEGRATION_CONTRACT.md`: the Detour boundary contract (frozen export handoff plus the
+  public `/v1` API surface); read it before changing public schemas or Detour exports.
 - `docs/DATA_QUALITY_GOVERNANCE.md`: data-quality doctrine, synthetic data policy, source-bias
   caveats, and export governance.
 - `docs/METHODOLOGY.md`: implemented methodology and operating workflow.

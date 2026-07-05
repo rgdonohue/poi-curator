@@ -254,6 +254,8 @@ historical/cultural facts.
 
 ## Governance Docs
 
+- `docs/INTEGRATION_CONTRACT.md`: the Detour <-> POI Curator boundary contract covering the
+  frozen CSV/manifest handoff and the live `/v1` API surface
 - `docs/ARCHITECTURE.md`: high-level architectural overview of the layered source-ecology model,
   canonical/evidence split, matching, editorial layer, and Santa Fe reference deployment
 - `docs/DEPLOYMENT.md`: deployment template for adapting POI Curator to another city
