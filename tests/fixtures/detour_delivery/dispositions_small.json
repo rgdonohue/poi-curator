@@ -1,0 +1,32 @@
+{
+  "description": "Synthetic test-fixture dispositions for the Detour delivery golden test. Not corpus data.",
+  "schema_version": 1,
+  "excluded_rows": [
+    {
+      "dedupe_key": "osm:relation/5",
+      "reason": "out_of_bbox: test fixture trail anchor north of bbox max 35.78; dropped"
+    }
+  ],
+  "collapses": [
+    {
+      "reason": "osm_relation_members",
+      "members": [
+        "osm:relation/1",
+        "osm:way/2"
+      ],
+      "note": "Alpha House: relation + member way (test fixture)."
+    }
+  ],
+  "review_candidate_sets": [
+    [
+      "osm:node/6",
+      "osm:node/7"
+    ]
+  ],
+  "data_quality_flags": [
+    {
+      "dedupe_key": "osm:node/3",
+      "issue": "test fixture: co-located Beta Church pair deliberately kept distinct"
+    }
+  ]
+}

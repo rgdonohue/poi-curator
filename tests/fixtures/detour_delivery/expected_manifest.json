@@ -1,0 +1,72 @@
+{
+  "clusters": [
+    {
+      "alias_names": [],
+      "chosen_display_name": "Alpha House",
+      "disposition": "collapsed",
+      "dropped": [
+        {
+          "dedupe_key": "osm:way/2",
+          "lat": 35.68005,
+          "lon": -105.94005,
+          "name": "Alpha House",
+          "poi_id": "fixture-poi-2"
+        }
+      ],
+      "reason": "osm_relation_members",
+      "survivor_dedupe_key": "osm:relation/1",
+      "survivor_poi_id": "fixture-poi-1"
+    },
+    {
+      "disposition": "left_colocated",
+      "members": [
+        "osm:node/3",
+        "osm:node/4"
+      ]
+    },
+    {
+      "disposition": "review_candidate",
+      "distance_m": 21.49,
+      "members": [
+        "osm:node/6",
+        "osm:node/7"
+      ]
+    }
+  ],
+  "contract": "detour-export",
+  "data_quality_flags": [
+    {
+      "dedupe_key": "osm:node/3",
+      "issue": "test fixture: co-located Beta Church pair deliberately kept distinct"
+    }
+  ],
+  "excluded_rows": [
+    {
+      "dedupe_key": "osm:relation/5",
+      "lat": 36.0,
+      "lon": -105.9,
+      "name": "Gamma National Trail",
+      "poi_id": "fixture-poi-5",
+      "reason": "out_of_bbox: test fixture trail anchor north of bbox max 35.78; dropped"
+    }
+  ],
+  "inputs": {
+    "dispositions": {
+      "path": "tests/fixtures/detour_delivery/dispositions_small.json",
+      "sha256": "98c97426ee9bc8016155b20fd29dc645959ccff05657953b41c7d7dd91e0822a"
+    },
+    "v1_csv": {
+      "path": "tests/fixtures/detour_delivery/v1_small.csv",
+      "rows": 7,
+      "sha256": "15e472867dcc683c51debfe1df3334c3e3947e8a90a0e09d7f0a5f3899cb3c59"
+    }
+  },
+  "schema_version": 2,
+  "summary": {
+    "clusters_collapsed": 1,
+    "clusters_left_colocated": 1,
+    "review_candidates": 1,
+    "rows_after": 5,
+    "rows_before": 7
+  }
+}
